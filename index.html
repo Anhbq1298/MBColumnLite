@@ -1,0 +1,2099 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MBColumn Lite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #E9EDEB;
+    --sheet: #F6F8F7;
+    --ink: #1F2A30;
+    --ink-2: #56636A;
+    --rule: #C3CBC8;
+    --concrete: #C8CBC3;
+    --steel: #2B3A8C;
+    --amber: #D99A0F;
+    --pass: #2E7A4E;
+    --fail: #B8322A;
+    --cover: #D3302A;
+    --mesh: #4FA3E0;
+    --axis-x: #C8372D;
+    --axis-y: #2E8B57;
+    --axis-p: #6A3FB5;
+    --field: #FFFFFF;
+    --focus: #2B3A8C;
+    --num: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #182025; --sheet: #1E272D; --ink: #E3E8E6; --ink-2: #9AA7AD; --rule: #34424A;
+      --concrete: #46504F; --steel: #8FA2FF; --field: #141B1F; --focus: #8FA2FF; --cover: #FF6B5E; --mesh: #7CC4FF; --axis-x: #FF7B6E; --axis-y: #5FD08F; --axis-p: #B79BFF; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #182025; --sheet: #1E272D; --ink: #E3E8E6; --ink-2: #9AA7AD; --rule: #34424A;
+    --concrete: #46504F; --steel: #8FA2FF; --field: #141B1F; --focus: #8FA2FF; --cover: #FF6B5E; --mesh: #7CC4FF; --axis-x: #FF7B6E; --axis-y: #5FD08F; --axis-p: #B79BFF; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body {
+    background: var(--paper); color: var(--ink);
+    font: 400 14px/1.45 Barlow, system-ui, sans-serif;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+  /* ── Title block ─────────────────────────────────────────── */
+  .titlebar {
+    display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+    padding: 14px 20px 12px; border-bottom: 1px solid var(--rule);
+  }
+  .titlebar h1 { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -0.01em; }
+  .titlebar h1 span { font-weight: 400; color: var(--ink-2); }
+  .titlebar .status { margin-left: auto; font-family: var(--num); color: var(--ink-2); }
+  .exports { display: inline-flex; gap: 6px; align-self: center; }
+  .btn.export { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; font-weight: 600; font-size: 13px; }
+  .btn.export svg { width: 15px; height: 15px; stroke: currentColor; }
+  .btn.export:disabled { opacity: 0.45; cursor: default; }
+  .status.busy::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--amber); margin-right: 7px; vertical-align: 1px; animation: pulse 0.9s infinite alternate; }
+  @keyframes pulse { to { opacity: 0.25; } }
+  @media (prefers-reduced-motion: reduce) { .status.busy::before { animation: none; } }
+
+  /* ── Layout ──────────────────────────────────────────────── */
+  .workspace {
+    display: grid; gap: 0;
+    grid-template-columns: 360px minmax(380px, 1fr) 380px;
+    min-height: calc(100vh - 54px - 330px);
+  }
+  .panel { padding: 14px 18px 18px; }
+  .panel + .panel, .stage { border-left: 1px solid var(--rule); }
+  .results {
+    display: grid; grid-template-columns: minmax(300px, 1.1fr) 1fr 1fr;
+    border-top: 1px solid var(--rule);
+  }
+  .results > section { padding: 14px 18px 18px; min-width: 0; }
+  .results > section + section { border-left: 1px solid var(--rule); }
+  @media (max-width: 1100px) {
+    .workspace { grid-template-columns: 1fr 1fr; }
+    .stage { grid-column: 1 / -1; order: -1; border-left: 0; border-bottom: 1px solid var(--rule); }
+    .panel + .panel { border-left: 1px solid var(--rule); }
+    .results { grid-template-columns: 1fr 1fr; }
+    .results > section:first-child { grid-column: 1 / -1; border-bottom: 1px solid var(--rule); }
+    .results > section:nth-child(2) { border-left: 0; }
+  }
+  @media (max-width: 680px) {
+    .workspace, .results { grid-template-columns: 1fr; }
+    .panel + .panel, .results > section + section { border-left: 0; border-top: 1px solid var(--rule); }
+    .titlebar, .panel, .results > section { padding-left: 16px; padding-right: 16px; }
+  }
+
+  h2 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+  h2:not(:first-child) { margin-top: 18px; }
+  .hint { color: var(--ink-2); font-size: 12.5px; margin: 6px 0 0; }
+
+  /* ── Fields ──────────────────────────────────────────────── */
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+  .fields .wide { grid-column: 1 / -1; }
+  label.f { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; color: var(--ink-2); min-width: 0; }
+  label.f > span { white-space: nowrap; }
+  /* all math in Cambria Math (Windows/Office); fallbacks for other systems */
+  math { font-family: "Cambria Math", "STIX Two Math", "Latin Modern Math", math; }
+  [data-tex] math { font-size: 1.22em; }
+  label.f input, label.f select {
+    color: var(--ink); background: var(--field); border: 1px solid var(--rule); border-radius: 3px;
+    padding: 5px 7px; font-family: var(--num); font-size: 14.5px; font-variant-numeric: tabular-nums; min-width: 0; width: 100%;
+  }
+  label.f select { font-family: Barlow, system-ui, sans-serif; font-size: 14px; }
+
+  /* ── Tables ──────────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; font-family: var(--num); font-variant-numeric: tabular-nums; }
+  th { text-align: right; font-weight: 500; color: var(--ink-2); font-size: 12.5px; padding: 0 4px 4px; border-bottom: 1px solid var(--rule); }
+  th:first-child, td:first-child { text-align: left; }
+  td { padding: 2px 4px; border-bottom: 1px solid color-mix(in srgb, var(--rule) 55%, transparent); text-align: right; }
+  td input, td select {
+    width: 100%; min-width: 0; border: 1px solid transparent; background: transparent; padding: 3px 3px; border-radius: 2px;
+    text-align: right; font-family: var(--num); font-size: 14.5px; font-variant-numeric: tabular-nums;
+  }
+  td select { text-align: left; }
+  td input:hover, td select:hover { border-color: var(--rule); }
+  td input:focus, td select:focus { border-color: var(--focus); background: var(--field); outline: none; }
+  td.name input { text-align: left; }
+  tr.sel td { background: color-mix(in srgb, var(--amber) 18%, transparent); }
+  tr.outside td input[data-k] { color: var(--cover); font-weight: 600; }
+  .rowbtn { width: 26px; height: 26px; border: 1px solid var(--rule); background: var(--field); border-radius: 3px; cursor: pointer; line-height: 1; font-size: 17px; }
+  .rowbtn:hover { border-color: var(--ink-2); }
+  .tablewrap { max-height: 360px; overflow: auto; }
+  #loadTable col.c-name { width: 22%; } #loadTable.slender th { font-size: 11.5px; line-height: 1.15; padding-left: 2px; padding-right: 2px; }
+  #loadTable.slender col.c-name { width: 17%; } #loadTable.slender td { padding: 2px 1px; } #loadTable.slender td input { font-size: 13.5px; padding: 3px 2px; } #loadTable col.c-del, #rebarTable col.c-del { width: 32px; }
+  /* rebar table: #, and the delete button fit their content; X, Y, Bar and A share the rest equally */
+  #rebarTable col.c-i { width: 30px; }
+  #rebarTable td:nth-child(4) select { width: auto; max-width: 100%; }
+  #rebarTable th:nth-child(4), #rebarTable td:nth-child(4) { text-align: right; }
+  #loadTable, #rebarTable { table-layout: fixed; }
+  td select { padding-right: 0; }
+  td input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+  td input[type=number]::-webkit-inner-spin-button, td input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  thead th { position: sticky; top: 0; background: var(--paper); z-index: 1; }
+  .tablefoot { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .tablefoot .count { margin-left: auto; color: var(--ink-2); font-family: var(--num); }
+  .btn { border: 1px solid var(--rule); background: var(--field); border-radius: 3px; padding: 5px 11px; cursor: pointer; }
+  .btn:hover { border-color: var(--ink-2); }
+  .btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+  details.gen { margin-top: 14px; border-top: 1px solid var(--rule); padding-top: 10px; }
+  details.gen summary { cursor: pointer; font-weight: 600; }
+  details.gen .fields { margin-top: 10px; }
+  table.faces { margin-top: 8px; font-family: Barlow, system-ui, sans-serif; }
+  table.faces th { text-align: left; } table.faces td { text-align: left; padding: 3px 4px; }
+  table.faces td .hint { font-size: 11.5px; margin-left: 4px; }
+  table.faces input, table.faces select { width: 100%; border: 1px solid var(--rule); background: var(--field); border-radius: 3px; padding: 3px 5px; text-align: left; }
+  table.faces td:nth-child(2) { width: 64px; } table.faces td:nth-child(3) { width: 84px; }
+
+  /* ── Stage (section canvas) ──────────────────────────────── */
+  .stage { display: flex; flex-direction: column; background: var(--sheet); min-width: 0; }
+  .stagebar { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 14px; padding: 12px 16px; border-bottom: 1px solid var(--rule); }
+  .stagebar label.f { width: 118px; }
+  .stagebar label.f.color { width: auto; }
+  .stagebar input[type=color] { width: 44px; height: 31px; padding: 2px; }
+  .check { display: inline-flex; align-items: center; gap: 6px; padding-bottom: 6px; cursor: pointer; }
+  .canvaswrap { position: relative; flex: 1; min-height: 380px; }
+  .canvastools {
+    position: absolute; top: 10px; left: 10px; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 60px;
+    background: var(--field); border: 1px solid var(--rule); border-radius: 4px; padding: 3px;
+  }
+  .tool { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 30px; border: 0; background: transparent; border-radius: 3px; padding: 0; cursor: pointer; }
+  .tool svg { width: 17px; height: 17px; fill: currentColor; stroke: currentColor; }
+  .tool:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+  .tool:disabled { opacity: 0.35; cursor: default; background: transparent; }
+  .tool-sep { width: 70%; height: 1px; background: var(--rule); margin: 3px 0; }
+  .tool[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .tool[data-tool="remove"][aria-pressed="true"] { background: var(--cover); color: #fff; }
+  .toolbar-size { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0 0; margin-top: 3px; border-top: 1px solid var(--rule); width: 100%; color: var(--ink-2); font-size: 12px; }
+  .toolbar-size input { width: 46px; text-align: center; border: 1px solid var(--rule); background: var(--field); border-radius: 3px; padding: 2px 4px; font-family: var(--num); }
+  .toolbar-size select { width: 54px; padding: 2px 1px !important; font-size: 12px; }
+  .toolbar-size select { border: 1px solid var(--rule); background: var(--field); border-radius: 3px; padding: 2px 4px; font-family: var(--num); }
+  #section { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+  .readout { position: absolute; left: 12px; bottom: 8px; z-index: 1; font-family: var(--num); color: var(--ink-2); font-size: 13px; pointer-events: none;
+    background: color-mix(in srgb, var(--sheet) 88%, transparent); border-radius: 3px; padding: 1px 6px; max-width: calc(100% - 240px); }
+  @media (max-width: 700px) { .readout { max-width: calc(100% - 260px); } }
+  @media (max-width: 520px) { .readout { display: none; } }
+
+  /* ── Results ─────────────────────────────────────────────── */
+  .verdict { display: flex; align-items: baseline; gap: 14px; margin-bottom: 10px; flex-wrap: wrap; }
+  .verdict .ratio { font-family: var(--num); font-size: 40px; font-weight: 600; line-height: 1; }
+  .verdict .ratio.pass { color: var(--pass); }
+  .verdict .ratio.fail { color: var(--fail); }
+  .verdict .what { color: var(--ink-2); }
+  .tag { font-family: Barlow, sans-serif; font-weight: 600; font-size: 12.5px; }
+  .tag.pass { color: var(--pass); }
+  .tag.fail { color: var(--fail); }
+  tr.gov td { font-weight: 600; }
+  tr.gov td:first-child { box-shadow: inset 3px 0 0 var(--amber); }
+  .chart { width: 100%; height: 270px; display: block; }
+  .charthead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 6px; }
+  .charthead h2 { margin: 0; flex: 1 0 100%; }
+  #slCase { width: auto; padding: 2px 6px; }
+  label.f.mini { flex-direction: row; align-items: center; gap: 6px; }
+  label.f.mini input { width: 70px; padding: 2px 6px; font-size: 13.5px; }
+  .pmm3d { border-top: 1px solid var(--rule); padding: 14px 18px 18px; }
+  .pmm3d + .results { border-top: 1px solid var(--rule); }
+  .pmm3d-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; }
+  .pmm3d-head h2 { margin: 0; }
+  .pmm3d-head .check { padding-bottom: 0; }
+  .pmm3d-head label.f.p3d { flex-direction: row; align-items: center; gap: 8px; }
+  .pmm3d-head label.f.p3d input { width: 64px; padding: 2px 6px; }
+  .chart3d { width: 100%; height: 520px; display: block; touch-action: none; cursor: grab; margin-top: 8px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 3px; }
+  .chart3d:active { cursor: grabbing; }
+  @media (max-width: 680px) { .chart3d { height: 380px; } .pmm3d { padding-left: 16px; padding-right: 16px; } }
+  .caption { color: var(--ink-2); font-size: 12.5px; margin: 4px 0 0; }
+  .error { color: var(--fail); font-weight: 500; }
+  .note { color: var(--ink-2); font-size: 12px; padding: 10px 20px 18px; border-top: 1px solid var(--rule); }
+</style>
+</head>
+<body>
+
+<header class="titlebar">
+  <h1>MBColumn <span>Lite</span></h1>
+  <span class="hint" style="margin:0">Rectangular RC column · Eurocode 2 · fibre PMM check</span>
+  <span class="status" id="status" role="status" aria-live="polite">Ready</span>
+  <div class="exports" role="group" aria-label="Export report">
+    <button type="button" class="btn export" id="exportPdf" title="Download the report as a PDF">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h5.5L13 5v9.5H4z" fill="none" stroke-width="1.3" stroke-linejoin="round"/><path d="M9.5 1.5V5H13" fill="none" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 7.5v4.5M6.5 10l2 2 2-2" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>PDF</button>
+    <button type="button" class="btn export" id="exportHtml" title="Download the report as a standalone HTML page">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h5.5L13 5v9.5H4z" fill="none" stroke-width="1.3" stroke-linejoin="round"/><path d="M9.5 1.5V5H13" fill="none" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.5 7.5v4.5M6.5 10l2 2 2-2" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>HTML</button>
+  </div>
+</header>
+
+<main>
+  <div class="workspace">
+    <!-- ── Inputs ── -->
+    <section class="panel" aria-labelledby="h-design">
+      <h2 id="h-design">Materials</h2>
+      <div class="fields">
+        <label class="f wide"><span>Concrete grade</span> <select id="concreteGrade"></select></label>
+        <label class="f wide"><span>Rebar grade</span> <select id="steelGrade"></select></label>
+        <label class="f"><span><span data-tex="f_{ck}">f<sub>ck</sub></span> (MPa)</span> <input id="fc" type="number" step="0.5" min="10"></label>
+        <label class="f"><span><span data-tex="f_{yk}">f<sub>yk</sub></span> (MPa)</span> <input id="fy" type="number" step="5" min="200"></label>
+        <label class="f"><span><span data-tex="E_{s}">E<sub>s</sub></span> (MPa)</span> <input id="es" type="number" step="1000" value="200000"></label>
+        <label class="f"><span><span data-tex="\alpha_{cc}">α<sub>cc</sub></span></span> <input id="alphaCc" type="number" step="0.05" min="0.5" max="1" value="0.85"></label>
+        <label class="f wide"><span>Concrete stress–strain</span> <select id="strainProfile">
+            <option value="Ec2">Parabola–rectangle (εc2, εcu2)</option>
+            <option value="Ec3">Bilinear (εc3, εcu3)</option>
+          </select>
+        </label>
+      </div>
+
+      <h2>Section</h2>
+      <div class="fields">
+        <label class="f"><span>Width b, X (mm)</span> <input id="b" type="number" step="25" min="100" value="600"></label>
+        <label class="f"><span>Depth h, Y (mm)</span> <input id="h" type="number" step="25" min="100" value="600"></label>
+        <label class="f"><span>Cover to link (mm)</span> <input id="cover" type="number" step="5" min="0" value="40"></label>
+        <label class="f"><span>Link Ø (mm)</span> <input id="link" type="number" step="1" min="0" value="10"></label>
+        <label class="f wide"><span>Fibre mesh</span> <select id="fiberMode"><option value="count">By number of fibres</option><option value="size">By fibre size (mm)</option></select></label>
+        <label class="f fib-count"><span>Fibres along b</span> <input id="fiberNx" type="number" step="10" min="8" max="400"></label>
+        <label class="f fib-count"><span>Fibres along h</span> <input id="fiberNy" type="number" step="10" min="8" max="400"></label>
+        <label class="f fib-size"><span>Fibre size (mm)</span> <input id="fiber" type="number" step="5" min="2"></label>
+        <p class="hint wide" id="fiberInfo" style="margin:0"></p>
+      </div>
+
+      <h2>Slenderness</h2>
+      <label class="check"><input id="slOn" type="checkbox"> Check slenderness (EC2 §5.8, nominal curvature)</label>
+      <div class="fields" id="slFields" hidden>
+        <label class="f wide"><span>Member length L (mm)</span> <input id="slL" type="number" step="100" min="1"></label>
+        <label class="f"><span><span data-tex="k_x">k<sub>x</sub></span> (bending about X)</span> <input id="slKx" type="number" step="0.05" min="0.1"></label>
+        <label class="f"><span><span data-tex="k_y">k<sub>y</sub></span> (bending about Y)</span> <input id="slKy" type="number" step="0.05" min="0.1"></label>
+        <label class="check wide"><input id="slBraced" type="checkbox"> Braced member</label>
+        <label class="f wide"><span>Creep ratio <span data-tex="\varphi_{ef}">φ<sub>ef</sub></span> (EC2 §5.8.4)</span>
+          <select id="slPhiMode"><option value="auto">EC2 Annex B: φ(∞,t₀) × M0Eqp/M0Ed</option><option value="manual">Enter φef</option></select></label>
+        <label class="f phi-auto"><span>RH (%)</span> <input id="slRH" type="number" step="5" min="20" max="100"></label>
+        <label class="f phi-auto"><span><span data-tex="t_0">t<sub>0</sub></span> (days)</span> <input id="slT0" type="number" step="1" min="1"></label>
+        <label class="f phi-auto"><span>Cement class</span> <select id="slCement"><option value="S">S (slow)</option><option value="N">N (normal)</option><option value="R">R (rapid)</option></select></label>
+        <label class="f phi-auto"><span><span data-tex="M_{0Eqp}/M_{0Ed}">M0Eqp/M0Ed</span></span> <input id="slRatio" type="number" step="0.05" min="0" max="1"></label>
+        <label class="f phi-manual wide"><span><span data-tex="\varphi_{ef}">φ<sub>ef</sub></span></span> <input id="slPhi" type="number" step="0.1" min="0"></label>
+        <p class="hint wide" id="slPhiInfo" style="margin:0"></p>
+        <p class="hint wide" style="margin:0"><span data-tex="l_0 = k\,L">l<sub>0</sub> = k·L</span>. Enter the first-order end moments at the top and bottom of the column, signed in the section convention.</p>
+      </div>
+
+      <h2>Load cases</h2>
+      <div class="tablewrap">
+        <table id="loadTable"><colgroup id="loadCols"></colgroup>
+          <thead id="loadHead"></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="tablefoot">
+        <button class="rowbtn" type="button" id="addLoad" aria-label="Add load case">+</button>
+        <span class="hint" style="margin:0">Compression positive</span>
+      </div>
+    </section>
+
+    <!-- ── Section canvas ── -->
+    <section class="stage" aria-label="Section drawing">
+      <div class="stagebar">
+        <label class="f"><span>Grid spacing (mm)</span> <input id="gridSpacing" type="number" min="5" step="5" value="50"></label>
+        <label class="f color"><span>Grid colour</span> <input id="gridColor" type="color" value="#8FA9B4"></label>
+        <label class="check"><input id="showGrid" type="checkbox" checked> Show grid</label>
+        <label class="check"><input id="snap" type="checkbox" checked> Snap bars to grid</label>
+        <button class="btn" type="button" id="fitView" style="margin-left:auto">Fit view</button>
+      </div>
+      <div class="canvaswrap">
+        <canvas id="section" aria-label="Column section with rebar positions"></canvas>
+        <div class="canvastools" role="toolbar" aria-label="Rebar tools">
+          <button type="button" class="tool" data-tool="move" aria-pressed="true" title="Select and move bars (V). Shift-click adds, drag on empty space to box-select" aria-label="Select and move bars">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2l9 5-4 1.2L6.6 13z"/></svg></button>
+          <button type="button" class="tool" data-tool="add" aria-pressed="false" title="Add bar: click to place (A)" aria-label="Add bar">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke-width="1.6"/><path d="M8 5v6M5 8h6" fill="none" stroke-width="1.6"/></svg></button>
+          <button type="button" class="tool" data-tool="remove" aria-pressed="false" title="Remove: click a bar, or drag a box to remove several (X)" aria-label="Remove bars">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke-width="1.6"/><path d="M5 8h6" fill="none" stroke-width="1.6"/></svg></button>
+          <button type="button" class="tool" data-tool="array" aria-pressed="false" title="Array: click a start point, then an end point (R)" aria-label="Bar array">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 13.5l11-11" fill="none" stroke-width="1.2" stroke-dasharray="1.5 1.5"/><circle cx="3" cy="13" r="2"/><circle cx="8" cy="8" r="2"/><circle cx="13" cy="3" r="2"/></svg></button>
+          <div class="tool-sep" aria-hidden="true"></div>
+          <button type="button" class="tool" id="undoBtn" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 4L2.5 7l3 3" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 7h6.5a3.5 3.5 0 010 7H7" fill="none" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+          <button type="button" class="tool" id="redoBtn" title="Redo (Ctrl+Y or Ctrl+Shift+Z)" aria-label="Redo" disabled>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 4l3 3-3 3" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 7H6.5a3.5 3.5 0 000 7H9" fill="none" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+          <label class="toolbar-size" title="Bar size for new bars"><select id="toolBar" aria-label="Bar size for new bars"></select></label>
+          <label class="toolbar-size" id="arrayOpts" title="Number of bars in the array, including both ends" hidden><span aria-hidden="true">×</span> <input id="arrayCount" type="number" min="2" max="50" step="1" value="5" aria-label="Number of bars in the array, including both ends"></label>
+        </div>
+        <div class="readout" id="readout">Drag a bar to move it</div>
+      </div>
+    </section>
+
+    <!-- ── Rebar table ── -->
+    <section class="panel" aria-labelledby="h-rebar">
+      <h2 id="h-rebar">Rebar coordinates</h2>
+      <div class="tablewrap">
+        <table id="rebarTable"><colgroup><col class="c-i"><col><col><col class="c-bar"><col class="c-a"><col class="c-del"></colgroup>
+          <thead><tr><th>#</th><th>X (mm)</th><th>Y (mm)</th><th>Bar</th><th>A (mm²)</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="tablefoot">
+        <span class="count" id="barSummary"></span>
+      </div>
+      <p class="hint">Coordinates from the section centroid. Bars must sit inside the link line (cover + link Ø). Add and remove bars with the tools on the drawing, or edit cells here.</p>
+
+      <details class="gen" open>
+        <summary>Specify by face</summary>
+        <table class="faces" id="faceTable">
+          <thead><tr><th>Face</th><th>Bars</th><th>Bar</th></tr></thead>
+          <tbody>
+            <tr><td>Top <span class="hint">incl. corners</span></td><td><input id="faceTopN" type="number" min="0" max="40" step="1" aria-label="Top face bar count, including corners"></td><td><select id="faceTopBar" aria-label="Top face bar size"></select></td></tr>
+            <tr><td>Bottom <span class="hint">incl. corners</span></td><td><input id="faceBottomN" type="number" min="0" max="40" step="1" aria-label="Bottom face bar count, including corners"></td><td><select id="faceBottomBar" aria-label="Bottom face bar size"></select></td></tr>
+            <tr><td>Left <span class="hint">between corners</span></td><td><input id="faceLeftN" type="number" min="0" max="40" step="1" aria-label="Left face bar count, between the corners"></td><td><select id="faceLeftBar" aria-label="Left face bar size"></select></td></tr>
+            <tr><td>Right <span class="hint">between corners</span></td><td><input id="faceRightN" type="number" min="0" max="40" step="1" aria-label="Right face bar count, between the corners"></td><td><select id="faceRightBar" aria-label="Right face bar size"></select></td></tr>
+          </tbody>
+        </table>
+        <p class="hint">Bars are spaced evenly along each face against the link line. Replaces the current table.</p>
+        <div class="tablefoot"><button class="btn" type="button" id="faceApply">Replace bars</button></div>
+      </details>
+    </section>
+  </div>
+
+  <!-- ── Results ── -->
+  <section class="pmm3d" aria-labelledby="h-3d">
+    <div class="pmm3d-head">
+      <h2 id="h-3d">3D PMM surface</h2>
+      <span class="hint">Drag to rotate · scroll to zoom · double-click to reset</span>
+      <label class="f p3d"><span>P levels</span> <input id="p3dLevels" type="number" min="8" max="120" step="4" value="40"></label>
+      <label class="f p3d"><span>Plane at P (kN)</span> <input id="p3dPlane" type="number" step="100" placeholder="governing" style="width:96px"></label>
+      <label class="check"><input id="show3dMesh" type="checkbox" checked> Meridians</label>
+      <label class="check"><input id="show3dCases" type="checkbox" checked> All load cases</label>
+    </div>
+    <canvas class="chart3d" id="pmm3d" aria-label="3D PMM interaction surface"></canvas>
+    <p class="caption" id="pmm3dCaption"></p>
+  </section>
+
+  <div class="results">
+    <section aria-labelledby="h-res">
+      <h2 id="h-res">Capacity check</h2>
+      <div class="verdict" id="verdict"><span class="what">Add a load case to check the section.</span></div>
+      <div class="tablewrap" style="max-height:220px">
+        <table id="resTable">
+          <thead><tr><th>Case</th><th>D/C</th><th></th><th><span data-tex="\theta">θ</span> (°)</th><th><span data-tex="N_{Rd}">N<sub>Rd</sub></span> (kN)</th><th><span data-tex="M_{Rd}">M<sub>Rd</sub></span> (kNm)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="caption" id="surfaceInfo"></p>
+      <div id="slResults" hidden>
+        <h2 style="margin-top:14px">Slenderness (nominal curvature)</h2>
+        <div class="tablewrap" style="max-height:220px">
+          <table id="slTable">
+            <thead><tr><th>Case</th><th><span data-tex="\lambda_x / \lambda_{lim}">λx / λlim</span></th><th><span data-tex="\lambda_y / \lambda_{lim}">λy / λlim</span></th><th></th><th><span data-tex="M_{Ed,x}">M<sub>Ed,x</sub></span></th><th><span data-tex="M_{Ed,y}">M<sub>Ed,y</sub></span></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="caption" id="slCaption"></p>
+        <div class="charthead" style="margin-top:12px">
+          <h2 style="margin:0">Moment along the column</h2>
+          <label class="f mini"><span>Case</span> <select id="slCase" aria-label="Load case for the moment diagrams"></select></label>
+        </div>
+        <canvas class="chart" id="slDiagram" style="height:470px" aria-label="Mx and My along the column height"></canvas>
+        <p class="caption" id="slDiagCaption"></p>
+      </div>
+    </section>
+    <section aria-labelledby="h-pm">
+      <div class="charthead">
+        <h2 id="h-pm">P–M at governing angle</h2>
+        <label class="f mini"><span>Grid P (kN)</span> <input id="gridPmP" type="number" min="0" step="500" placeholder="auto" title="Grid spacing on the P axis. Leave blank for automatic."></label>
+        <label class="f mini"><span>M (kNm)</span> <input id="gridPmM" type="number" min="0" step="50" placeholder="auto" title="Grid spacing on the M axis. Leave blank for automatic."></label>
+      </div>
+      <canvas class="chart" id="pmChart" aria-label="P-M interaction diagram"></canvas>
+      <p class="caption" id="pmCaption"></p>
+    </section>
+    <section aria-labelledby="h-mm">
+      <div class="charthead">
+        <h2 id="h-mm">Mx–My at governing P</h2>
+        <label class="f mini"><span>Grid M (kNm)</span> <input id="gridMm" type="number" min="0" step="50" placeholder="auto" title="Grid spacing on both moment axes. Leave blank for automatic."></label>
+      </div>
+      <canvas class="chart" id="mmChart" aria-label="Mx-My interaction contour"></canvas>
+      <p class="caption" id="mmCaption"></p>
+    </section>
+  </div>
+
+</main>
+
+<p class="note">
+  Uses the MBColumn Eurocode 2 fibre PMM solver (γc 1.5, γs 1.15, εud 0.045; concrete fibres 100 × 100 by default, 72 neutral-axis angles × 120 depths) and radial 3D D/C check; each capacity point and every point on the charts is then solved exactly on the strain plane (Newton), so results and curves do not depend on the mesh. Ported from the C# core and matched against its approved baselines.
+  Slenderness (EC2 §5.8, nominal curvature) and the minimum moment N·e0 are applied when the slenderness check is on; otherwise demands are checked as entered. Preliminary study tool; results must be verified by a qualified engineer.
+</p>
+
+<script>
+window.MBCOLUMN_API_URL = window.MBCOLUMN_API_URL || 'https://REPLACE-WITH-RENDER-URL.onrender.com';
+</script>
+<script>
+(() => {
+  'use strict';
+
+  // ── Libraries (from the desktop app) ─────────────────────────────────────────
+  const GRADES = {
+    concrete: [['C20/25', 20], ['C25/30', 25], ['C30/37', 30], ['C35/45', 35], ['C40/50', 40], ['C45/55', 45],
+               ['C50/60', 50], ['C55/67', 55], ['C60/75', 60], ['C70/85', 70], ['C80/95', 80], ['C90/105', 90]],
+    steel: [['B400', 400], ['B500A', 500], ['B500B', 500], ['B500C', 500], ['B550', 550]],
+  };
+  // SingaporeRebarDatabase: T20 = 314, T25 = 491, others πd²/4
+  const SINGLE_BARS = [6, 8, 10, 13, 16, 20, 25, 32, 40].map((d) => ({
+    name: `T${d}`, dia: d, area: d === 25 ? 491 : d === 20 ? 314 : Math.PI * d * d / 4, count: 1, baseDia: d,
+    offsets: [[0, 0]], extentR: d / 2,
+  }));
+  // Bundled bars (EC2 §8.9), as RebarBundleLibrary in the desktop app: 2–4 identical bars in contact,
+  // one notional bar at the bundle centroid with φn = φ·√nb and area nb·As. Offsets place the touching bars.
+  function bundleOffsets(n, d) {
+    const r = d / 2, k = Math.sqrt(3);
+    return n === 2 ? [[-r, 0], [r, 0]]
+      : n === 3 ? [[-r, -r / k], [r, -r / k], [0, 2 * r / k]]
+      : [[-r, -r], [r, -r], [r, r], [-r, r]];
+  }
+  const BUNDLES = [];
+  for (const b of SINGLE_BARS) {
+    for (let n = 2; n <= 4; n++) {
+      const offsets = bundleOffsets(n, b.dia);
+      BUNDLES.push({ name: `${n}${b.name}`, dia: b.dia * Math.sqrt(n), area: b.area * n, count: n, baseDia: b.dia,
+        offsets, extentR: Math.max(...offsets.map(([x, y]) => Math.hypot(x, y))) + b.dia / 2 });
+    }
+  }
+  const BARS = [...SINGLE_BARS, ...BUNDLES];
+  const barByName = (n) => BARS.find((b) => b.name === n) || SINGLE_BARS[6];
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  const $ = (id) => document.getElementById(id);
+  const STORE_KEY = 'mbcolumn-lite-v1';
+  let state = {
+    concreteGrade: 'C30/37', steelGrade: 'B500B', fc: 30, fy: 500, es: 200000,
+    alphaCc: 0.85, strainProfile: 'Ec2', b: 600, h: 600, cover: 40, link: 10, fiber: 25, fiberMode: 'count', fiberNx: 100, fiberNy: 100,
+    grid: { spacing: 50, color: '#8FA9B4', show: true, snap: true },
+    chartGrid: { pmP: '', pmM: '', mm: '' },
+    slender: { on: false, L: 4000, kx: 1.0, ky: 1.0, phiEf: 2.0, braced: true, phiMode: 'auto', rh: 50, t0: 28, cement: 'N', ratio: 0.7 },
+    bars: [],
+    loads: [
+      { name: 'ULS 1', p: 3000, mx: 250, my: 120, mxb: 250, myb: 120 },
+      { name: 'ULS 2', p: 1200, mx: 380, my: 60, mxb: 380, myb: 60 },
+      { name: 'ULS 3', p: 4800, mx: 90, my: 210, mxb: 90, myb: 210 },
+    ],
+  };
+  let selected = -1;          // last bar clicked (anchor for scrolling the table)
+  let sel = new Set();        // all selected bars
+
+  // Bars must lie inside the link line: centre within b/2 − cover − link − Ø/2 of the centroid.
+  function barLimits(r) {
+    const half = barByName(r.bar).extentR, off = Math.max(0, state.cover) + Math.max(0, state.link) + half;
+    return { x: state.b / 2 - off, y: state.h / 2 - off };
+  }
+  function insideLinks(r) {
+    const lim = barLimits(r);
+    return lim.x >= 0 && lim.y >= 0 && Math.abs(r.x) <= lim.x + 1e-6 && Math.abs(r.y) <= lim.y + 1e-6;
+  }
+  function clampToLinks(r) {
+    const lim = barLimits(r);
+    // round to 0.1 mm, but never outward past the limit
+    const fit = (v, l) => { const m = Math.max(0, l), c = Math.max(-m, Math.min(m, v)), q = round1(c); return Math.abs(q) > m ? Math.sign(q) * Math.floor(m * 10) / 10 : q; };
+    r.x = fit(r.x, lim.x); r.y = fit(r.y, lim.y);
+  }
+
+  function perimeterBars(b, h, cover, link, bar, total) {
+    const n = Math.max(0, Math.round((total - 4) / 4)), per = n + 2;
+    const x = b / 2 - cover - link - bar.extentR, y = h / 2 - cover - link - bar.extentR;
+    if (x <= 0 || y <= 0) throw new Error('Cover and link leave no room for this bar size. Reduce the cover or link Ø, or enlarge the section.');
+    const out = [];
+    const add = (px, py) => { if (!out.some((q) => Math.abs(q.x - px) < 1e-6 && Math.abs(q.y - py) < 1e-6)) out.push({ x: px, y: py, bar: bar.name }); };
+    for (let i = 0; i < per; i++) add(-x + 2 * x * i / (per - 1), y);
+    for (let i = 0; i < per; i++) add(-x + 2 * x * i / (per - 1), -y);
+    for (let i = 1; i <= n; i++) { add(-x, -y + 2 * y * i / (n + 1)); add(x, -y + 2 * y * i / (n + 1)); }
+    return out.map((q) => ({ x: round1(q.x), y: round1(q.y), bar: q.bar }));
+  }
+  const round1 = (v) => Math.round(v * 10) / 10;
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if (saved && Array.isArray(saved.bars)) state = Object.assign(state, saved, { grid: Object.assign(state.grid, saved.grid || {}) });
+  } catch (_) { /* storage unavailable */ }
+  if (!state.bars.length) state.bars = perimeterBars(state.b, state.h, state.cover, state.link, barByName('T25'), 12);
+
+  const save = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (_) {} };
+
+  // Private server-side solver. No local PMM fallback.
+  const solver = {
+    mode: 'private API',
+    async call(route, input) {
+      const root = window.MBCOLUMN_API_URL.replace(/\/$/, '');
+      const response = await fetch(root + '/api/' + route, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'API error ' + response.status);
+      return data;
+    },
+    run(input) { return this.call('analyse', input); }
+  };
+
+  // ── Inputs ──────────────────────────────────────────────────────────────────
+  function fillGrades() {
+    const opt = (list, cur) => list.map(([n]) => `<option${n === cur ? ' selected' : ''}>${n}</option>`).join('');
+    $('concreteGrade').innerHTML = opt(GRADES.concrete, state.concreteGrade);
+    $('steelGrade').innerHTML = opt(GRADES.steel, state.steelGrade);
+  }
+
+  function syncInputs() {
+    fillGrades();
+    $('fc').value = state.fc; $('fy').value = state.fy; $('es').value = state.es;
+    $('alphaCc').value = state.alphaCc; $('strainProfile').value = state.strainProfile;
+    $('b').value = state.b; $('h').value = state.h; $('cover').value = state.cover; $('link').value = state.link;
+    if (!(state.fiber > 0)) state.fiber = 25; $('fiber').value = state.fiber;
+    if (!state.fiberMode) { state.fiberMode = 'count'; state.fiberNx = 100; state.fiberNy = 100; }
+    $('fiberMode').value = state.fiberMode; $('fiberNx').value = state.fiberNx; $('fiberNy').value = state.fiberNy; showFiberMode();
+    $('gridSpacing').value = state.grid.spacing; $('gridColor').value = state.grid.color;
+    $('showGrid').checked = state.grid.show; $('snap').checked = state.grid.snap;
+    state.chartGrid = Object.assign({ pmP: '', pmM: '', mm: '' }, state.chartGrid);
+    state.slender = Object.assign({ on: false, L: 4000, kx: 1.0, ky: 1.0, phiEf: 2.0, braced: true, phiMode: 'auto', rh: 50, t0: 28, cement: 'N', ratio: 0.7 }, state.slender);
+    if (String(state.slender.phiEf).trim() === '') state.slender.phiEf = 2.0;
+    state.loads.forEach((l) => { if (l.mxb == null) l.mxb = l.mx; if (l.myb == null) l.myb = l.my; });
+    $('slOn').checked = state.slender.on; $('slFields').hidden = !state.slender.on;
+    $('slL').value = state.slender.L; $('slKx').value = state.slender.kx; $('slKy').value = state.slender.ky;
+    $('slPhi').value = state.slender.phiEf; $('slBraced').checked = state.slender.braced;
+    $('slPhiMode').value = state.slender.phiMode; $('slRH').value = state.slender.rh; $('slT0').value = state.slender.t0;
+    $('slCement').value = state.slender.cement; $('slRatio').value = state.slender.ratio; showPhiMode();
+    $('gridPmP').value = state.chartGrid.pmP; $('gridPmM').value = state.chartGrid.pmM; $('gridMm').value = state.chartGrid.mm;
+  }
+
+  $('concreteGrade').addEventListener('change', (e) => {
+    state.concreteGrade = e.target.value; state.fc = GRADES.concrete.find(([n]) => n === e.target.value)[1];
+    $('fc').value = state.fc; changed();
+  });
+  $('steelGrade').addEventListener('change', (e) => {
+    state.steelGrade = e.target.value; state.fy = GRADES.steel.find(([n]) => n === e.target.value)[1];
+    $('fy').value = state.fy; changed();
+  });
+  const numBind = (id, key, after) => $(id).addEventListener('input', (e) => {
+    const v = parseFloat(e.target.value); if (!Number.isFinite(v)) return;
+    state[key] = v; if (after) after(); changed();
+  });
+  numBind('fc', 'fc'); numBind('fy', 'fy'); numBind('es', 'es'); numBind('alphaCc', 'alphaCc');
+  numBind('b', 'b', () => { fitView(); renderRebarTable(); }); numBind('h', 'h', () => { fitView(); renderRebarTable(); });
+  numBind('fiber', 'fiber'); numBind('fiberNx', 'fiberNx'); numBind('fiberNy', 'fiberNy');
+  $('fiberMode').addEventListener('change', (e) => { state.fiberMode = e.target.value; showFiberMode(); changed(); });
+  function showFiberMode() {
+    document.querySelectorAll('.fib-count').forEach((el) => { el.hidden = state.fiberMode !== 'count'; });
+    document.querySelectorAll('.fib-size').forEach((el) => { el.hidden = state.fiberMode === 'count'; });
+  }
+  numBind('cover', 'cover', () => { renderRebarTable(); draw(); }); numBind('link', 'link', () => { renderRebarTable(); draw(); });
+  $('strainProfile').addEventListener('change', (e) => { state.strainProfile = e.target.value; changed(); });
+  $('gridSpacing').addEventListener('input', (e) => { const v = parseFloat(e.target.value); if (v >= 1) { state.grid.spacing = v; draw(); save(); } });
+  $('gridColor').addEventListener('input', (e) => { state.grid.color = e.target.value; draw(); save(); });
+  $('showGrid').addEventListener('change', (e) => { state.grid.show = e.target.checked; draw(); save(); });
+  $('snap').addEventListener('change', (e) => { state.grid.snap = e.target.checked; save(); });
+  $('fitView').addEventListener('click', () => { fitView(); draw(); });
+  $('slOn').addEventListener('change', (e) => { state.slender.on = e.target.checked; $('slFields').hidden = !e.target.checked; renderLoadTable(); changed(); });
+  [['slL', 'L'], ['slKx', 'kx'], ['slKy', 'ky']].forEach(([id, k]) => $(id).addEventListener('input', (e) => { const v = parseFloat(e.target.value); if (Number.isFinite(v)) { state.slender[k] = v; changed(); } }));
+  $('slPhi').addEventListener('input', (e) => { const v = parseFloat(e.target.value); if (v >= 0) { state.slender.phiEf = v; changed(); } });
+  [['slRH', 'rh'], ['slT0', 't0'], ['slRatio', 'ratio']].forEach(([id, k]) => $(id).addEventListener('input', (e) => { const v = parseFloat(e.target.value); if (Number.isFinite(v)) { state.slender[k] = v; changed(); } }));
+  $('slCement').addEventListener('change', (e) => { state.slender.cement = e.target.value; changed(); });
+  $('slPhiMode').addEventListener('change', (e) => { state.slender.phiMode = e.target.value; showPhiMode(); changed(); });
+  function showPhiMode() {
+    const auto = state.slender.phiMode !== 'manual';
+    document.querySelectorAll('.phi-auto').forEach((el) => { el.hidden = !auto; });
+    document.querySelectorAll('.phi-manual').forEach((el) => { el.hidden = auto; });
+  }
+  $('slBraced').addEventListener('change', (e) => { state.slender.braced = e.target.checked; changed(); });
+  [['gridPmP', 'pmP'], ['gridPmM', 'pmM'], ['gridMm', 'mm']].forEach(([id, k]) => $(id).addEventListener('input', (e) => {
+    state.chartGrid[k] = e.target.value; save(); drawCharts();
+  }));
+
+  // ── Rebar table ─────────────────────────────────────────────────────────────
+  const barOptions = (cur) => {
+    const o = (b) => `<option value="${b.name}"${b.name === cur ? ' selected' : ''}${b.count > 1 ? ` title="Equivalent Ø ${b.dia.toFixed(1)} mm"` : ''}>${b.name}</option>`;
+    return `<optgroup label="Single bars">${SINGLE_BARS.map(o).join('')}</optgroup>`
+      + [2, 3, 4].map((n) => `<optgroup label="Bundles of ${n}, Øn = Ø√${n} (EC2 §8.9)">${BUNDLES.filter((b) => b.count === n).map(o).join('')}</optgroup>`).join('');
+  };
+  const FACES = ['Top', 'Bottom', 'Left', 'Right'];
+  function syncFaces() {
+    state.faces = Object.assign({ Top: { n: 4, bar: 'T25' }, Bottom: { n: 4, bar: 'T25' }, Left: { n: 2, bar: 'T25' }, Right: { n: 2, bar: 'T25' } }, state.faces);
+    for (const f of FACES) { $(`face${f}N`).value = state.faces[f].n; $(`face${f}Bar`).innerHTML = barOptions(state.faces[f].bar); }
+  }
+  FACES.forEach((f) => {
+    $(`face${f}N`).addEventListener('input', (e) => { const n = Math.round(+e.target.value); if (n >= 0) { state.faces[f].n = n; save(); } });
+    $(`face${f}Bar`).addEventListener('change', (e) => { state.faces[f].bar = e.target.value; save(); });
+  });
+  syncFaces();
+
+  function renderRebarTable() {
+    const tb = $('rebarTable').tBodies[0];
+    tb.innerHTML = state.bars.map((r, i) => `
+      <tr data-i="${i}" class="${sel.has(i) ? 'sel' : ''}${insideLinks(r) ? '' : ' outside'}">
+        <td>${i + 1}</td>
+        <td><input type="number" step="5" data-k="x" value="${r.x}" aria-label="Bar ${i + 1} X"></td>
+        <td><input type="number" step="5" data-k="y" value="${r.y}" aria-label="Bar ${i + 1} Y"></td>
+        <td><select data-k="bar" aria-label="Bar ${i + 1} size">${barOptions(r.bar)}</select></td>
+        <td>${barByName(r.bar).area.toFixed(0)}</td>
+        <td><button class="rowbtn" type="button" data-del="${i}" aria-label="Remove bar ${i + 1}">−</button></td>
+      </tr>`).join('');
+    updateBarSummary();
+  }
+  function updateBarSummary() {
+    const as = state.bars.reduce((s, r) => s + barByName(r.bar).area, 0);
+    const rho = as / (state.b * state.h) * 100;
+    const nPhys = state.bars.reduce((s2, r) => s2 + barByName(r.bar).count, 0), nB = state.bars.filter((r) => barByName(r.bar).count > 1).length;
+    $('barSummary').textContent = `${nPhys} bars${nB ? ` (${nB} bundle${nB > 1 ? 's' : ''})` : ''} · As ${as.toFixed(0)} mm² · ρ ${rho.toFixed(2)}%`;
+  }
+  $('rebarTable').addEventListener('input', (e) => {
+    const tr = e.target.closest('tr'); if (!tr || !e.target.dataset.k) return;
+    const i = +tr.dataset.i, k = e.target.dataset.k;
+    if (k === 'bar') { state.bars[i].bar = e.target.value; tr.cells[4].textContent = barByName(e.target.value).area.toFixed(0); updateBarSummary(); }
+    else { const v = parseFloat(e.target.value); if (!Number.isFinite(v)) return; state.bars[i][k] = v; }
+    tr.classList.toggle('outside', !insideLinks(state.bars[i]));
+    draw(); changed();
+  });
+  // When an X/Y/bar edit is committed, pull the bar back inside the link line.
+  $('rebarTable').addEventListener('change', (e) => {
+    const tr = e.target.closest('tr[data-i]'); if (!tr || !e.target.dataset.k) return;
+    const r = state.bars[+tr.dataset.i];
+    if (insideLinks(r)) { if (mergeOverlaps()) { draw(); changed(); } return; }
+    clampToLinks(r);
+    tr.querySelector('[data-k=x]').value = r.x; tr.querySelector('[data-k=y]').value = r.y;
+    tr.classList.toggle('outside', !insideLinks(r));
+    setStatus(`Bar ${+tr.dataset.i + 1} moved onto the link line.`);
+    mergeOverlaps(); draw(); changed();
+  });
+  $('rebarTable').addEventListener('focusin', (e) => { const tr = e.target.closest('tr[data-i]'); if (tr) select(+tr.dataset.i, false); });
+  $('rebarTable').addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del]'); if (!del) return;
+    state.bars.splice(+del.dataset.del, 1); clearSel(); renderRebarTable(); draw(); changed();
+  });
+  // Specify by face (desktop "sides different" layout): top and bottom rows include the corners,
+  // left and right faces hold the bars between them. Each face is set against the link line.
+  function faceBars() {
+    const F = state.faces, inset = Math.max(0, state.cover) + Math.max(0, state.link);
+    const lim = (bar) => ({ x: state.b / 2 - inset - barByName(bar).extentR, y: state.h / 2 - inset - barByName(bar).extentR });
+    const out = [], row = (n, bar, yy) => {
+      const L = lim(bar); if (L.x < 0 || L.y < 0) throw new Error(`${bar} does not fit inside the link line.`);
+      for (let i = 0; i < n; i++) out.push({ x: n === 1 ? 0 : -L.x + 2 * L.x * i / (n - 1), y: yy(L), bar });
+    };
+    row(F.Top.n, F.Top.bar, (L) => L.y);
+    row(F.Bottom.n, F.Bottom.bar, (L) => -L.y);
+    // side bars sit between the top and bottom rows
+    const yTop = F.Top.n ? lim(F.Top.bar).y : state.h / 2 - inset, yBot = F.Bottom.n ? -lim(F.Bottom.bar).y : -(state.h / 2 - inset);
+    for (const [f, sgn] of [['Left', -1], ['Right', 1]]) {
+      const n = F[f].n, bar = F[f].bar, L = lim(bar);
+      if (L.x < 0) throw new Error(`${bar} does not fit inside the link line.`);
+      for (let i = 1; i <= n; i++) out.push({ x: sgn * L.x, y: yBot + (yTop - yBot) * i / (n + 1), bar });
+    }
+    return out.map((r) => ({ x: round1(r.x), y: round1(r.y), bar: r.bar }));
+  }
+  $('faceApply').addEventListener('click', () => {
+    try {
+      const bars = faceBars();
+      if (!bars.length) { setStatus('Set at least one bar on a face.', true); return; }
+      state.bars = bars; clearSel(); mergeOverlaps(); renderRebarTable(); draw(); changed();
+    } catch (err) { setStatus(err.message, true); }
+  });
+
+  function clearSel() { sel = new Set(); selected = -1; }
+  function syncSelRows() { [...$('rebarTable').tBodies[0].rows].forEach((r) => r.classList.toggle('sel', sel.has(+r.dataset.i))); }
+  // additive: toggle i in the selection (shift/ctrl-click); otherwise i becomes the only selected bar
+  function select(i, scroll, additive) {
+    if (additive && i >= 0) { if (sel.has(i)) sel.delete(i); else sel.add(i); }
+    else sel = new Set(i >= 0 ? [i] : []);
+    selected = i;
+    syncSelRows();
+    if (scroll && i >= 0) $('rebarTable').tBodies[0].rows[i]?.scrollIntoView({ block: 'nearest' });
+    draw();
+  }
+
+  // ── Load table ──────────────────────────────────────────────────────────────
+  function renderLoadTable() {
+    const sl = state.slender && state.slender.on;
+    $('loadTable').classList.toggle('slender', !!sl);
+    const cols = sl ? [['p', 'P (kN)'], ['mx', 'Mx top'], ['mxb', 'Mx bot'], ['my', 'My top'], ['myb', 'My bot']]
+                    : [['p', 'P (kN)'], ['mx', 'Mx (kNm)'], ['my', 'My (kNm)']];
+    $('loadCols').innerHTML = '<col class="c-name">' + cols.map(() => '<col>').join('') + '<col class="c-del">';
+    $('loadHead').innerHTML = `<tr><th>Case</th>${cols.map(([, t]) => `<th>${t}</th>`).join('')}<th></th></tr>`;
+    $('loadTable').tBodies[0].innerHTML = state.loads.map((l, i) => `
+      <tr data-i="${i}">
+        <td class="name"><input data-k="name" value="${escapeHtml(l.name)}" aria-label="Load case ${i + 1} name"></td>
+        ${cols.map(([k, t]) => `<td><input type="number" step="${k === 'p' ? 50 : 10}" data-k="${k}" value="${l[k] ?? 0}" aria-label="${escapeHtml(l.name)} ${t}"></td>`).join('')}
+        <td><button class="rowbtn" type="button" data-del="${i}" aria-label="Remove ${escapeHtml(l.name)}">−</button></td>
+      </tr>`).join('');
+  }
+  const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  $('loadTable').addEventListener('input', (e) => {
+    const tr = e.target.closest('tr'); if (!tr) return;
+    const k = e.target.dataset.k, l = state.loads[+tr.dataset.i];
+    if (k === 'name') l.name = e.target.value;
+    else { const v = parseFloat(e.target.value); if (!Number.isFinite(v)) return; l[k] = v; }
+    changed();
+  });
+  $('loadTable').addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del]'); if (!del) return;
+    state.loads.splice(+del.dataset.del, 1); renderLoadTable(); changed();
+  });
+  $('addLoad').addEventListener('click', () => {
+    state.loads.push({ name: `ULS ${state.loads.length + 1}`, p: 1000, mx: 100, my: 0, mxb: 100, myb: 0 });
+    renderLoadTable(); changed();
+    $('loadTable').tBodies[0].lastElementChild.querySelector('[data-k=p]').focus();
+  });
+
+  // ── Section canvas ──────────────────────────────────────────────────────────
+  const cv = $('section'), ctx = cv.getContext('2d');
+  let view = { s: 1, cx: 0, cy: 0 }, cssW = 0, cssH = 0;
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  function resizeCanvas(c) {
+    const r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    c.width = Math.max(1, Math.round(r.width * dpr)); c.height = Math.max(1, Math.round(r.height * dpr));
+    const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { w: r.width, h: r.height, g };
+  }
+  function fitView() {
+    // left: vertical toolbar + h dimension; top: section info box; bottom: b dimension + convention box
+    const padR = 64, padL = 124, padT = 88, padB = 88;
+    view.s = Math.min((cssW - padL - padR) / state.b, (cssH - padT - padB) / state.h);
+    if (!(view.s > 0)) view.s = 0.5;
+    view.cx = padL + (cssW - padL - padR) / 2; view.cy = padT + (cssH - padT - padB) / 2;
+  }
+  const toScreen = (x, y) => [view.cx + x * view.s, view.cy - y * view.s];
+  const toWorld = (sx, sy) => [(sx - view.cx) / view.s, (view.cy - sy) / view.s];
+
+  function draw() {
+    const g = ctx; g.clearRect(0, 0, cssW, cssH);
+    const ink = css('--ink'), ink2 = css('--ink-2'), concrete = css('--concrete'), steel = css('--steel'), amber = css('--amber');
+    const [x0, y0] = toScreen(-state.b / 2, state.h / 2), w = state.b * view.s, hh = state.h * view.s;
+
+    // concrete with section hatch
+    g.save();
+    g.fillStyle = concrete; g.globalAlpha = 0.55; g.fillRect(x0, y0, w, hh); g.globalAlpha = 1;
+    g.beginPath(); g.rect(x0, y0, w, hh); g.clip();
+    g.strokeStyle = ink2; g.globalAlpha = 0.16; g.lineWidth = 1;
+    for (let d = -hh; d < w + hh; d += 14) { g.beginPath(); g.moveTo(x0 + d, y0 + hh); g.lineTo(x0 + d + hh, y0); g.stroke(); }
+    g.restore();
+
+    // grid
+    if (state.grid.show && state.grid.spacing * view.s >= 4) {
+      const sp = state.grid.spacing, [wx0, wy1] = toWorld(0, 0), [wx1, wy0] = toWorld(cssW, cssH);
+      g.strokeStyle = state.grid.color; g.lineWidth = 1;
+      for (let k = Math.ceil(wx0 / sp); k * sp <= wx1; k++) {
+        const [sx] = toScreen(k * sp, 0); g.globalAlpha = k === 0 ? 0.95 : 0.5;
+        g.beginPath(); g.moveTo(Math.round(sx) + 0.5, 0); g.lineTo(Math.round(sx) + 0.5, cssH); g.stroke();
+      }
+      for (let k = Math.ceil(wy0 / sp); k * sp <= wy1; k++) {
+        const [, sy] = toScreen(0, k * sp); g.globalAlpha = k === 0 ? 0.95 : 0.5;
+        g.beginPath(); g.moveTo(0, Math.round(sy) + 0.5); g.lineTo(cssW, Math.round(sy) + 0.5); g.stroke();
+      }
+      g.globalAlpha = 1;
+    }
+
+    // outline
+    g.strokeStyle = ink; g.lineWidth = 2; g.strokeRect(x0, y0, w, hh);
+
+    // link (stirrup) band between the cover line and the inner link line
+    const cov = Math.max(0, state.cover) * view.s, lk = Math.max(0, state.link) * view.s;
+    const coverColor = css('--cover');
+    if (w - 2 * cov > 0 && hh - 2 * cov > 0) {
+      if (lk > 0 && w - 2 * (cov + lk) > 0 && hh - 2 * (cov + lk) > 0) {
+        g.save();
+        g.beginPath(); g.rect(x0 + cov, y0 + cov, w - 2 * cov, hh - 2 * cov);
+        g.rect(x0 + cov + lk, y0 + cov + lk, w - 2 * (cov + lk), hh - 2 * (cov + lk));
+        g.fillStyle = steel; g.globalAlpha = 0.22; g.fill('evenodd'); g.restore();
+        g.strokeStyle = steel; g.lineWidth = 1.5;
+        g.strokeRect(x0 + cov + lk, y0 + cov + lk, w - 2 * (cov + lk), hh - 2 * (cov + lk));
+      }
+      g.strokeStyle = coverColor; g.lineWidth = 1.5; g.setLineDash([6, 4]);
+      g.strokeRect(x0 + cov, y0 + cov, w - 2 * cov, hh - 2 * cov);
+      g.setLineDash([]);
+    }
+    // centroid axes
+    const [ox, oy] = toScreen(0, 0);
+    const cx3 = css('--axis-x'), cy3 = css('--axis-y'), cp3 = css('--axis-p');
+    arrow(g, ox, oy, ox + 46, oy, cx3, 1.5, false);
+    arrow(g, ox, oy, ox, oy - 46, cy3, 1.5, false);
+    // column axis out of the page (⊙) = +P, compression
+    g.strokeStyle = cp3; g.fillStyle = cp3; g.lineWidth = 1.5;
+    g.beginPath(); g.arc(ox, oy, 6, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.arc(ox, oy, 1.8, 0, Math.PI * 2); g.fill();
+    g.font = '600 12px "Barlow Semi Condensed", sans-serif';
+    g.fillStyle = cx3; g.fillText('X', ox + 50, oy + 4); g.fillStyle = cy3; g.fillText('Y', ox - 3, oy - 52);
+
+    // dimensions
+    g.font = '500 13px "Barlow Semi Condensed", sans-serif'; g.fillStyle = ink2; g.strokeStyle = ink2; g.lineWidth = 1;
+    const dimY = y0 + hh + 24, dimX = x0 - 24;
+    g.beginPath(); g.moveTo(x0, dimY); g.lineTo(x0 + w, dimY); g.moveTo(x0, dimY - 5); g.lineTo(x0, dimY + 5); g.moveTo(x0 + w, dimY - 5); g.lineTo(x0 + w, dimY + 5);
+    g.moveTo(dimX, y0); g.lineTo(dimX, y0 + hh); g.moveTo(dimX - 5, y0); g.lineTo(dimX + 5, y0); g.moveTo(dimX - 5, y0 + hh); g.lineTo(dimX + 5, y0 + hh); g.stroke();
+    g.textAlign = 'center'; g.fillText(`b = ${state.b}`, x0 + w / 2, dimY + 16);
+    g.save(); g.translate(dimX - 9, y0 + hh / 2); g.rotate(-Math.PI / 2); g.fillText(`h = ${state.h}`, 0, 0); g.restore();
+    g.textAlign = 'left';
+
+    // bars
+    state.bars.forEach((r, i) => {
+      const def = barByName(r.bar), [sx, sy] = toScreen(r.x, r.y), rad = Math.max(3.5, def.extentR * view.s);
+      g.fillStyle = steel;
+      for (const [ox, oy] of def.offsets) {
+        g.beginPath(); g.arc(sx + ox * view.s, sy - oy * view.s, Math.max(def.count > 1 ? 2 : 3.5, def.baseDia / 2 * view.s), 0, Math.PI * 2); g.fill();
+      }
+      if (def.count > 1) { g.strokeStyle = css('--sheet'); g.lineWidth = 0.75; for (const [ox, oy] of def.offsets) { g.beginPath(); g.arc(sx + ox * view.s, sy - oy * view.s, def.baseDia / 2 * view.s, 0, Math.PI * 2); g.stroke(); } }
+      if (sel.has(i)) { g.lineWidth = 3; g.strokeStyle = amber; g.beginPath(); g.arc(sx, sy, rad + 3.5, 0, Math.PI * 2); g.stroke(); }
+      if (!insideLinks(r)) { g.lineWidth = 2; g.strokeStyle = css('--cover'); g.beginPath(); g.arc(sx, sy, rad + 2, 0, Math.PI * 2); g.stroke(); }
+      if (rad > 7) {
+        g.font = '600 10px "Barlow Semi Condensed", sans-serif'; g.textAlign = 'center';
+        if (def.count > 1) { g.strokeStyle = steel; g.lineWidth = 3; g.strokeText(i + 1, sx, sy + 3.5); }
+        g.fillStyle = css('--paper'); g.fillText(i + 1, sx, sy + 3.5); g.textAlign = 'left';
+      }
+      if (tool === 'remove' && (i === hoverBar || (box && box.mode === 'remove' && box.hits.includes(i)))) {
+        g.strokeStyle = css('--cover'); g.lineWidth = 2.5;
+        g.beginPath(); g.arc(sx, sy, rad + 4, 0, Math.PI * 2); g.stroke();
+        g.beginPath(); g.moveTo(sx - rad * 0.7, sy - rad * 0.7); g.lineTo(sx + rad * 0.7, sy + rad * 0.7); g.moveTo(sx + rad * 0.7, sy - rad * 0.7); g.lineTo(sx - rad * 0.7, sy + rad * 0.7); g.stroke();
+      }
+    });
+
+    // remove-by-area box
+    if (box) {
+      const cvr = box.mode === 'remove' ? css('--cover') : css('--amber'), c = hexRgb(cvr);
+      g.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},0.08)`; g.strokeStyle = cvr; g.lineWidth = 1.25; g.setLineDash([5, 3]);
+      g.fillRect(Math.min(box.x0, box.x1), Math.min(box.y0, box.y1), Math.abs(box.x1 - box.x0), Math.abs(box.y1 - box.y0));
+      g.strokeRect(Math.min(box.x0, box.x1), Math.min(box.y0, box.y1), Math.abs(box.x1 - box.x0), Math.abs(box.y1 - box.y0));
+      g.setLineDash([]);
+    }
+
+    // array preview: dashed line and ghost bars between start and current end
+    if (tool === 'array') {
+      const ghost = (r, clash) => {
+        const [gx, gy] = toScreen(r.x, r.y), rad = Math.max(3.5, barByName(r.bar).extentR * view.s);
+        g.globalAlpha = clash ? 0.18 : 0.45; g.fillStyle = steel; g.beginPath(); g.arc(gx, gy, rad, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1;
+        g.strokeStyle = clash ? ink2 : steel; g.lineWidth = 1.25; g.setLineDash([3, 2]); g.beginPath(); g.arc(gx, gy, rad + 2, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+      };
+      if (arrayStart && arrayEnd) {
+        const [ax1, ay1] = toScreen(arrayStart.x, arrayStart.y), [ax2, ay2] = toScreen(arrayEnd.x, arrayEnd.y);
+        g.strokeStyle = amber; g.lineWidth = 1.5; g.setLineDash([6, 4]);
+        g.beginPath(); g.moveTo(ax1, ay1); g.lineTo(ax2, ay2); g.stroke(); g.setLineDash([]);
+        if (Math.hypot(arrayEnd.x - arrayStart.x, arrayEnd.y - arrayStart.y) >= 1) {
+          const placed = [];
+          arrayPositions(arrayStart, arrayEnd).forEach((r) => { const c = clashes(r, state.bars) || clashes(r, placed); if (!c) placed.push(r); ghost(r, c); });
+        }
+        g.fillStyle = amber; g.beginPath(); g.arc(ax1, ay1, 4, 0, Math.PI * 2); g.fill();
+      } else if (hover) {
+        const [hx, hy] = toScreen(hover.x, hover.y);
+        g.strokeStyle = amber; g.lineWidth = 1.5; g.beginPath(); g.moveTo(hx - 8, hy); g.lineTo(hx + 8, hy); g.moveTo(hx, hy - 8); g.lineTo(hx, hy + 8); g.stroke();
+      }
+    }
+
+    // no rebar: say so on the drawing
+    if (!state.bars.length) {
+      const msg = 'Invalid section: no rebar', [mx, my] = toScreen(0, 0);
+      g.font = '600 15px Barlow, sans-serif'; const tw = g.measureText(msg).width;
+      g.fillStyle = css('--sheet'); g.strokeStyle = css('--cover'); g.lineWidth = 1.5;
+      g.beginPath(); g.rect(mx - tw / 2 - 14, my - 50, tw + 28, 30); g.fill(); g.stroke();
+      g.fillStyle = css('--cover'); g.textAlign = 'center'; g.fillText(msg, mx, my - 30); g.textAlign = 'left';
+    }
+
+    drawCornerBoxes(g);
+
+    // ghost of the bar about to be placed
+    if (tool === 'add' && hover) {
+      const [sx, sy] = toScreen(hover.x, hover.y), rad = Math.max(3.5, barByName(hover.bar).extentR * view.s);
+      g.globalAlpha = 0.4; g.fillStyle = steel; g.beginPath(); g.arc(sx, sy, rad, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1;
+      g.strokeStyle = steel; g.lineWidth = 1.5; g.setLineDash([3, 2]); g.beginPath(); g.arc(sx, sy, rad + 2, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+    }
+  }
+
+  // White boxes: section information (upper right) and force sign convention (lower right).
+  function drawCornerBoxes(g) {
+    const ink = css('--ink'), ink2 = css('--ink-2'), steel = css('--steel'), field = css('--field'), rule = css('--rule');
+    const box = (x, y, w, h) => {
+      g.fillStyle = field; g.strokeStyle = rule; g.lineWidth = 1;
+      g.beginPath(); g.roundRect ? g.roundRect(x + 0.5, y + 0.5, w, h, 4) : g.rect(x + 0.5, y + 0.5, w, h); g.fill(); g.stroke();
+    };
+    const num = '"Barlow Semi Condensed", sans-serif';
+
+    // section information
+    const byDia = new Map();
+    for (const r of state.bars) { const d = barByName(r.bar); byDia.set(d.baseDia, (byDia.get(d.baseDia) || 0) + d.count); }
+    const makeUp = state.bars.length ? [...byDia.entries()].sort((a, b) => b[0] - a[0]).map(([d, n]) => `${n}T${d}`).join(' + ') : 'No rebar';
+    const as = state.bars.reduce((t, r) => t + barByName(r.bar).area, 0), rho = as / (state.b * state.h) * 100;
+    const lines = [
+      [{ t: makeUp, f: `600 14px ${num}`, c: state.bars.length ? ink : css('--cover') }],
+      [{ t: `As ${as.toFixed(0)} mm²`, f: `500 12.5px ${num}`, c: ink2 }, { t: `ρ ${rho.toFixed(2)}%`, f: `600 12.5px ${num}`, c: ink }],
+      [{ t: `Cover ${state.cover}`, f: `500 12.5px ${num}`, c: css('--cover') }, { t: `Link Ø${state.link}`, f: `500 12.5px ${num}`, c: steel }],
+    ];
+    const width = (line) => line.reduce((t, sp, i) => { g.font = sp.f; return t + g.measureText(sp.t).width + (i ? 12 : 0); }, 0);
+    const bw = Math.max(...lines.map(width)) + 20, bh = lines.length * 18 + 10, bx = cssW - bw - 10, by = 10;
+    box(bx, by, bw, bh);
+    lines.forEach((line, li) => {
+      let x = bx + 10; const y = by + 20 + li * 18;
+      line.forEach((sp, i) => { g.font = sp.f; g.fillStyle = sp.c; g.textAlign = 'left'; if (i) x += 12; g.fillText(sp.t, x, y); x += g.measureText(sp.t).width; });
+    });
+
+    // force sign convention (moment vectors by right-hand rule, P compression positive)
+    const cx3 = css('--axis-x'), cy3 = css('--axis-y'), cp3 = css('--axis-p');
+    g.font = `600 11.5px ${num}`;
+    const kw = 50 + g.measureText('+Mx').width + g.measureText('+My').width + 22 + 34 + g.measureText('+P compression').width, kh = 30;
+    const kx0 = cssW - kw - 10, ky0 = cssH - kh - 10, ky = ky0 + kh / 2 + 1;
+    box(kx0, ky0, kw, kh);
+    let kx = kx0 + 10;
+    arrow(g, kx, ky, kx + 26, ky, cx3, 1.5, true); g.fillStyle = cx3; g.fillText('+Mx', kx + 31, ky + 4); kx += 31 + g.measureText('+Mx').width + 14;
+    arrow(g, kx, ky + 8, kx, ky - 9, cy3, 1.5, true); g.fillStyle = cy3; g.fillText('+My', kx + 8, ky + 4); kx += 8 + g.measureText('+My').width + 14;
+    g.strokeStyle = cp3; g.fillStyle = cp3; g.lineWidth = 1.5;
+    g.beginPath(); g.arc(kx + 6, ky, 6, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.arc(kx + 6, ky, 1.8, 0, Math.PI * 2); g.fill();
+    g.fillText('+P compression', kx + 16, ky + 4);
+  }
+
+  function hitBar(sx, sy) {
+    for (let i = state.bars.length - 1; i >= 0; i--) {
+      const r = state.bars[i], [bx, by] = toScreen(r.x, r.y), rad = Math.max(8, barByName(r.bar).extentR * view.s + 3);
+      if ((sx - bx) ** 2 + (sy - by) ** 2 <= rad * rad) return i;
+    }
+    return -1;
+  }
+  function placeBar(r, wx, wy) {
+    const sp = state.grid.spacing;
+    if (state.grid.snap && sp > 0) { wx = Math.round(wx / sp) * sp; wy = Math.round(wy / sp) * sp; }
+    r.x = wx; r.y = wy;
+    clampToLinks(r); // snapped points past the link line stop on it
+  }
+  // ── Canvas tools: move / add / remove ───────────────────────────────────────
+  let drag = -1, dragOrig = null, dragArm = null, dragMoved = false, tool = 'move', hover = null, hoverBar = -1, box = null; // box: remove-by-area drag (screen px)
+  $('toolBar').innerHTML = barOptions(state.bars[state.bars.length - 1]?.bar || 'T25');
+  const TOOL_HINT = { move: 'Click or box-select bars; shift-click adds; drag to move', add: 'Click inside the link line to place a bar', remove: 'Click a bar, or drag a box, to remove', array: 'Click the first bar position' };
+  let arrayStart = null, arrayEnd = null;
+  function setTool(t) {
+    tool = t; hover = null; hoverBar = -1; arrayStart = null; arrayEnd = null;
+    $('arrayOpts').hidden = t !== 'array';
+    document.querySelectorAll('.tool[data-tool]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tool === t)));
+    $('readout').textContent = TOOL_HINT[t]; draw();
+  }
+  document.querySelectorAll('.tool[data-tool]').forEach((b) => b.addEventListener('click', () => { setTool(b.dataset.tool); cv.focus(); }));
+  $('arrayCount').addEventListener('input', () => draw());
+  $('toolBar').addEventListener('change', (e) => {
+    if (tool !== 'move' || !sel.size) return;
+    for (const k of sel) { state.bars[k].bar = e.target.value; clampToLinks(state.bars[k]); }
+    mergeOverlaps(); renderRebarTable(); draw(); changed(); cv.focus();
+  });
+
+  function addBarAt(wx, wy) {
+    if (Math.abs(wx) > state.b / 2 || Math.abs(wy) > state.h / 2) return;
+    const r = { x: 0, y: 0, bar: $('toolBar').value };
+    placeBar(r, wx, wy);
+    if (!insideLinks(r)) { setStatus('This bar size does not fit inside the link line.', true); return; }
+    const clash = state.bars.findIndex((q) => Math.hypot(q.x - r.x, q.y - r.y) < barByName(q.bar).extentR + barByName(r.bar).extentR);
+    if (clash >= 0) { setStatus(`A bar is already there (bar ${clash + 1}).`, true); return; }
+    state.bars.push(r); selected = state.bars.length - 1;
+    renderRebarTable(); select(selected, true); changed();
+  }
+  // A start/end point for the array: an existing bar's centre if one is clicked, else the snapped point.
+  function pickPoint(sx, sy) {
+    const i = hitBar(sx, sy);
+    if (i >= 0) return { x: state.bars[i].x, y: state.bars[i].y };
+    const [wx, wy] = toWorld(sx, sy);
+    if (Math.abs(wx) > state.b / 2 || Math.abs(wy) > state.h / 2) return null;
+    const r = { x: 0, y: 0, bar: $('toolBar').value }; placeBar(r, wx, wy); return { x: r.x, y: r.y };
+  }
+  function arrayPositions(a, b) {
+    const n = Math.max(2, Math.min(50, Math.round(+$('arrayCount').value) || 2)), bar = $('toolBar').value;
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const r = { x: a.x + (b.x - a.x) * i / (n - 1), y: a.y + (b.y - a.y) * i / (n - 1), bar };
+      clampToLinks(r); out.push(r);
+    }
+    return out;
+  }
+  const clashes = (r, list) => list.some((q) => Math.hypot(q.x - r.x, q.y - r.y) < barByName(q.bar).extentR + barByName(r.bar).extentR);
+  function placeArray(a, b) {
+    if (Math.hypot(b.x - a.x, b.y - a.y) < 1) { setStatus('Pick an end point away from the start point.', true); return; }
+    const added = [];
+    let skipped = 0;
+    for (const r of arrayPositions(a, b)) {
+      if (!insideLinks(r) || clashes(r, state.bars) || clashes(r, added)) { skipped++; continue; }
+      added.push(r);
+    }
+    if (!added.length) { setStatus('Every position already has a bar.', true); return; }
+    const first = state.bars.length; state.bars.push(...added);
+    renderRebarTable(); select(state.bars.length - 1, true); sel = new Set(added.map((_, k) => first + k)); syncSelRows(); draw(); changed();
+    setTimeout(() => setStatus(`Added ${added.length} bar${added.length > 1 ? 's' : ''}${skipped ? ` (${skipped} skipped where a bar already exists)` : ''}.`), 0);
+  }
+
+  // Auto-merge: bars that coincide, overlap or touch become one bar at their area-weighted
+  // centroid, keeping the larger bar size. Runs whenever an edit is committed.
+  function mergeOverlaps() {
+    const near = (a, b) => Math.hypot(a.x - b.x, a.y - b.y) < barByName(a.bar).extentR + barByName(b.bar).extentR + 0.5;
+    let merged = 0, again = true;
+    while (again) {
+      again = false;
+      outer: for (let i = 0; i < state.bars.length; i++) {
+        for (let j = i + 1; j < state.bars.length; j++) {
+          const a = state.bars[i], b = state.bars[j];
+          if (!near(a, b)) continue;
+          const da = barByName(a.bar), db = barByName(b.bar), A = da.area + db.area;
+          const keep = { x: (a.x * da.area + b.x * db.area) / A, y: (a.y * da.area + b.y * db.area) / A, bar: da.area >= db.area ? a.bar : b.bar };
+          clampToLinks(keep); keep.x = round1(keep.x); keep.y = round1(keep.y);
+          state.bars[i] = keep; state.bars.splice(j, 1);
+          const wasSel = sel.has(i) || sel.has(j);
+          sel = new Set([...sel].filter((k) => k !== j).map((k) => (k > j ? k - 1 : k))); if (wasSel) sel.add(i);
+          if (selected === j) selected = i; else if (selected > j) selected--;
+          merged++; again = true; break outer;
+        }
+      }
+    }
+    if (merged) { mergeNote = `merged ${merged} overlapping bar${merged > 1 ? 's' : ''}`; renderRebarTable(); }
+    return merged;
+  }
+
+  function removeBar(i) {
+    state.bars.splice(i, 1); clearSel(); hoverBar = -1; renderRebarTable(); draw(); changed();
+  }
+
+  const ptr = (e) => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  cv.addEventListener('pointerdown', (e) => {
+    const [sx, sy] = ptr(e), i = hitBar(sx, sy);
+    if (tool === 'add') { if (i >= 0) select(i, true); else { const [wx, wy] = toWorld(sx, sy); addBarAt(wx, wy); } return; }
+    if (tool === 'remove') {
+      if (i >= 0) { removeBar(i); return; }
+      box = { mode: 'remove', x0: sx, y0: sy, x1: sx, y1: sy, hits: [] }; cv.setPointerCapture(e.pointerId); return;
+    }
+    if (tool === 'array') {
+      const pt = pickPoint(sx, sy); if (!pt) return;
+      if (!arrayStart) { arrayStart = pt; arrayEnd = pt; draw(); }
+      else { placeArray(arrayStart, pt); arrayStart = null; arrayEnd = null; $('readout').textContent = TOOL_HINT.array; draw(); }
+      return;
+    }
+    const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+    if (i < 0) {
+      // empty space: start a selection box (keeps the current selection with shift/ctrl)
+      if (!additive) { clearSel(); syncSelRows(); }
+      box = { mode: 'select', additive, base: new Set(sel), x0: sx, y0: sy, x1: sx, y1: sy, hits: [] };
+      cv.setPointerCapture(e.pointerId); draw(); return;
+    }
+    if (additive) { select(i, true, true); return; }
+    if (!sel.has(i)) select(i, true);
+    // drag every selected bar together; the grabbed bar sets the (snapped) offset
+    drag = i; dragArm = { sx, sy }; dragOrig = new Map([...sel].map((k) => [k, { x: state.bars[k].x, y: state.bars[k].y }]));
+    cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener('pointermove', (e) => {
+    const [sx, sy] = ptr(e), [wx, wy] = toWorld(sx, sy);
+    // nothing moves until the pointer travels a few pixels: a click only selects
+    if (drag >= 0 && dragArm && Math.hypot(sx - dragArm.sx, sy - dragArm.sy) < 5) return;
+    if (drag >= 0) {
+      dragArm = null; dragMoved = true;
+      const g0 = dragOrig.get(drag), t = { x: 0, y: 0, bar: state.bars[drag].bar }; placeBar(t, wx, wy);
+      const dx = t.x - g0.x, dy = t.y - g0.y, rows = $('rebarTable').tBodies[0].rows;
+      for (const [k, o] of dragOrig) {
+        const r = state.bars[k]; r.x = o.x + dx; r.y = o.y + dy; clampToLinks(r);
+        const row = rows[k];
+        if (row) { row.cells[1].firstElementChild.value = r.x; row.cells[2].firstElementChild.value = r.y; row.classList.toggle('outside', !insideLinks(r)); }
+      }
+      draw();
+    } else if (box) {
+      box.x1 = sx; box.y1 = sy;
+      const [xa, xb] = [Math.min(box.x0, sx), Math.max(box.x0, sx)], [ya, yb] = [Math.min(box.y0, sy), Math.max(box.y0, sy)];
+      box.hits = state.bars.map((r, k) => { const [bx, by] = toScreen(r.x, r.y); return bx >= xa && bx <= xb && by >= ya && by <= yb ? k : -1; }).filter((k) => k >= 0);
+      if (box.mode === 'select') { sel = new Set([...box.base, ...box.hits]); syncSelRows(); }
+      draw();
+    } else if (tool === 'add') {
+      const inSection = Math.abs(wx) <= state.b / 2 && Math.abs(wy) <= state.h / 2;
+      if (inSection && hitBar(sx, sy) < 0) { const r = { x: 0, y: 0, bar: $('toolBar').value }; placeBar(r, wx, wy); hover = r; } else hover = null;
+      draw();
+    } else if (tool === 'remove') {
+      const i = hitBar(sx, sy); if (i !== hoverBar) { hoverBar = i; draw(); }
+    } else if (tool === 'array') {
+      hover = pickPoint(sx, sy);
+      if (arrayStart && hover) arrayEnd = hover;
+      draw();
+    }
+    const b = drag >= 0 ? state.bars[drag] : null;
+    const arrayInfo = () => {
+      if (!arrayStart) return hover ? `Start at X ${hover.x}  Y ${hover.y} mm · click to set` : TOOL_HINT.array;
+      const n = Math.max(2, Math.round(+$('arrayCount').value) || 2), L = Math.hypot(arrayEnd.x - arrayStart.x, arrayEnd.y - arrayStart.y);
+      return `${n} × ${$('toolBar').value} @ ${fmt(L / (n - 1), 0)} mm · click the last bar position (Esc cancels)`;
+    };
+    $('readout').textContent = box ? (box.mode === 'remove' ? `${box.hits.length} bar${box.hits.length === 1 ? '' : 's'} · release to remove` : `${sel.size} selected`)
+      : tool === 'array' && drag < 0 ? arrayInfo()
+      : b ? (sel.size > 1 ? `Moving ${sel.size} bars` : `Bar ${drag + 1}: X ${b.x}  Y ${b.y} mm`)
+      : tool === 'move' && sel.size ? `${sel.size} selected · Delete removes · arrows nudge · pick a size to change`
+      : hover ? `New ${hover.bar} at X ${hover.x}  Y ${hover.y} mm`
+      : `X ${wx.toFixed(0)}  Y ${wy.toFixed(0)} mm · ${TOOL_HINT[tool]}`;
+    cv.style.cursor = drag >= 0 ? 'grabbing' : tool === 'add' || tool === 'array' ? 'copy' : tool === 'remove' ? (hitBar(sx, sy) >= 0 ? 'pointer' : 'default') : hitBar(sx, sy) >= 0 ? 'grab' : 'default';
+  });
+  cv.addEventListener('pointerleave', () => { if (hover || hoverBar >= 0) { hover = null; hoverBar = -1; draw(); } });
+  const endDrag = () => {
+    if (drag >= 0) { const moved = dragMoved; drag = -1; dragOrig = null; dragArm = null; dragMoved = false; if (moved) { mergeOverlaps(); draw(); changed(); } }
+    if (box && box.mode === 'select') { box = null; draw(); return; }
+    if (box) {
+      const hits = box.hits.slice().sort((a, b) => b - a); box = null;
+      if (hits.length) { hits.forEach((k) => state.bars.splice(k, 1)); clearSel(); hoverBar = -1; renderRebarTable(); changed(); }
+      draw();
+    }
+  };
+  cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
+  cv.addEventListener('dblclick', (e) => {
+    if (tool !== 'move') return;
+    const [sx, sy] = ptr(e); if (hitBar(sx, sy) >= 0) return;
+    const [wx, wy] = toWorld(sx, sy); addBarAt(wx, wy);
+  });
+  // Canvas shortcuts work from anywhere on the page, except while typing in a field.
+  document.addEventListener('keydown', (e) => {
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' && !['checkbox', 'color', 'button'].includes(t.type) || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+    if ((e.key === 'Delete' || e.key === 'Backspace') && sel.size) {
+      e.preventDefault();
+      [...sel].sort((a, b) => b - a).forEach((k) => state.bars.splice(k, 1));
+      clearSel(); hoverBar = -1; renderRebarTable(); draw(); changed(); return;
+    }
+    const nudge = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[e.key];
+    if (nudge && sel.size) {
+      e.preventDefault();
+      const step = e.altKey ? 1 : (state.grid.spacing > 0 ? state.grid.spacing : 10);
+      for (const k of sel) { const r = state.bars[k]; r.x += nudge[0] * step; r.y += nudge[1] * step; clampToLinks(r); }
+      mergeOverlaps(); renderRebarTable(); draw(); changed(); return;
+    }
+    if (e.key === 'Escape' && tool === 'move' && sel.size) { e.preventDefault(); clearSel(); syncSelRows(); draw(); return; }
+    if (e.key === 'Escape' && tool === 'array' && arrayStart) { e.preventDefault(); arrayStart = null; arrayEnd = null; $('readout').textContent = TOOL_HINT.array; draw(); return; }
+    if (e.ctrlKey || e.metaKey) return;
+    const k = { v: 'move', a: 'add', x: 'remove', r: 'array', Escape: 'move' }[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+    if (k) { e.preventDefault(); setTool(k); }
+  });
+  cv.tabIndex = 0;
+
+  // ── Solve ───────────────────────────────────────────────────────────────────
+  let timer = 0, lastResult = null, runSeq = 0, mergeNote = '';
+  function setStatus(text, isError, busy) {
+    const s = $('status'); s.textContent = text; s.classList.toggle('busy', !!busy); s.classList.toggle('error', !!isError);
+  }
+  function changed() { save(); clearTimeout(timer); timer = setTimeout(runSolve, 180); clearTimeout(histTimer); histTimer = setTimeout(recordHistory, 350); }
+
+  // ── Undo / redo: snapshots of the whole input state, recorded once edits settle ──
+  let hist = [], hPos = -1, histTimer = 0;
+  function recordHistory() {
+    histTimer = 0;
+    const snap = JSON.stringify(state);
+    if (hist[hPos] === snap) return;
+    hist = hist.slice(0, hPos + 1); hist.push(snap);
+    if (hist.length > 200) hist.shift();
+    hPos = hist.length - 1; updateUndoButtons();
+  }
+  function updateUndoButtons() { $('undoBtn').disabled = hPos <= 0; $('redoBtn').disabled = hPos >= hist.length - 1; }
+  function restore(snap) {
+    state = JSON.parse(snap);
+    clearSel(); box = null; drag = -1;
+    syncInputs(); syncFaces(); renderRebarTable(); renderLoadTable(); fitView(); draw(); save();
+    clearTimeout(timer); runSolve(); updateUndoButtons();
+  }
+  function undo() { if (histTimer) { clearTimeout(histTimer); recordHistory(); } if (hPos > 0) restore(hist[--hPos]); }
+  function redo() { if (histTimer) { clearTimeout(histTimer); recordHistory(); } if (hPos < hist.length - 1) restore(hist[++hPos]); }
+  $('undoBtn').addEventListener('click', () => { undo(); cv.focus(); });
+  $('redoBtn').addEventListener('click', () => { redo(); cv.focus(); });
+  document.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    // inside a text field, Ctrl+Z belongs to the field
+    const t = e.target, typing = t && (t.tagName === 'INPUT' && t.type !== 'checkbox' && t.type !== 'color' || t.tagName === 'TEXTAREA');
+    const k = e.key.toLowerCase();
+    if (typing) return;
+    if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+    else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
+  });
+
+  function validate() {
+    if (!(state.b > 0 && state.h > 0)) return 'Section width and depth must be greater than zero.';
+    if (!state.bars.length) return 'Invalid section: no rebar. Add at least one bar to check the column.';
+    if (!(state.fc > 0 && state.fy > 0 && state.es > 0)) return 'Material strengths and Es must be greater than zero.';
+    if (state.cover < 0 || state.link < 0) return 'Cover and link Ø cannot be negative.';
+    if (state.fiberMode !== 'count' && !(state.fiber >= 2)) return 'Fibre size must be at least 2 mm.';
+    if (state.fiberMode === 'count' && !(state.fiberNx >= 8 && state.fiberNy >= 8)) return 'Use at least 8 fibres along b and along h.';
+    if (fiberCounts().nx * fiberCounts().ny > 160000) return 'Too many fibres (more than 400 × 400): use a coarser mesh.';
+    const out = state.bars.findIndex((r) => !insideLinks(r));
+    if (out >= 0) return `Bar ${out + 1} is outside the link line. Move it inside, or reduce the cover or link Ø.`;
+    if (state.slender.on) {
+      if (!(state.slender.L > 0)) return 'Slenderness: enter a member length L greater than zero.';
+      if (!(state.slender.kx > 0 && state.slender.ky > 0)) return 'Slenderness: effective length factors kx and ky must be greater than zero.';
+      const sl = state.slender;
+      if (sl.phiMode === 'manual' && !(sl.phiEf >= 0)) return 'Slenderness: φef must be zero or more.';
+      if (sl.phiMode !== 'manual' && !(sl.rh > 0 && sl.rh <= 100 && sl.t0 >= 1 && sl.ratio >= 0 && sl.ratio <= 1)) return 'Slenderness: RH must be 1–100 %, t0 at least 1 day and M0Eqp/M0Ed between 0 and 1.';
+    }
+    return null;
+  }
+
+  // Calculations run on the private backend; report reference tables remain public.
+  let lastSlender = null, lastPhi = null;
+  async function effectivePhi() {
+    const sl = state.slender;
+    if (sl.phiMode === 'manual') return lastPhi = { phiEf: Math.max(0, +sl.phiEf || 0), mode: 'manual' };
+    const h0 = 2 * state.b * state.h / (2 * (state.b + state.h)), fcm = state.fc + 8;
+    const c = await solver.call('creep', { rh: sl.rh, t0: sl.t0, h0, fcm, cement: sl.cement });
+    return lastPhi = { phiEf: c.phiInf * sl.ratio, mode: 'auto', h0, fcm, ...c };
+  }
+  async function designLoads() {
+    const sl = state.slender;
+    if (!sl.on) { lastSlender = null; lastPhi = null; return state.loads.map(l => ({ name:l.name, p:l.p, mx:l.mx, my:l.my })); }
+    const sec = { b: state.b, h: state.h, fck: state.fc, alphaCc: state.alphaCc, fyk: state.fy, es: state.es,
+      bars: state.bars.map(r => ({ x:r.x, y:r.y, area:barByName(r.bar).area })) };
+    const e = await effectivePhi();
+    const mem = { L:sl.L, kx:sl.kx, ky:sl.ky, phiEf:e.phiEf, braced:sl.braced };
+    $('slPhiInfo').innerHTML = e.mode === 'auto'
+      ? `h<sub>0</sub> = ${fmt(e.h0,0)} mm, φ(∞,t<sub>0</sub>) = ${fmt(e.phiInf,2)}, <strong>φ<sub>ef</sub> = ${fmt(e.phiEf,2)}</strong>`
+      : `<strong>φ<sub>ef</sub> = ${fmt(e.phiEf,2)}</strong> (entered)`;
+    const loads = state.loads.map(l => ({ nEd:l.p*1e3, mxTop:l.mx*1e6, mxBot:(l.mxb??l.mx)*1e6, myTop:l.my*1e6, myBot:(l.myb??l.my)*1e6 }));
+    lastSlender = await solver.call('slenderness',{section:sec,member:mem,loads});
+    return state.loads.map((l,i) => ({name:l.name,p:l.p,mx:lastSlender[i].mxEd/1e6,my:lastSlender[i].myEd/1e6}));
+  }
+  let lastDesign = [];
+  function reportDesignCode() {
+    const interp=(fc,pairs)=>{for(let i=1;i<pairs.length;i++)if(fc<=pairs[i][0]){const [a,av]=pairs[i-1],[b,bv]=pairs[i];return av+(bv-av)*(fc-a)/(b-a);}return pairs[pairs.length-1][1];};
+    const peak2=[[50,.002],[55,.0022],[60,.0023],[70,.0024],[80,.0025],[90,.0026]];
+    const peak3=[[50,.00175],[55,.0018],[60,.0019],[70,.002],[80,.0022],[90,.0023]];
+    const ultimate=[[50,.0035],[55,.0031],[60,.0029],[70,.0027],[80,.0026],[90,.0026]];
+    const exponent=[[50,2],[55,1.75],[60,1.6],[70,1.45],[80,1.4],[90,1.4]];
+    const eta=[[50,1],[55,.975],[60,.95],[70,.9],[80,.85],[90,.8]];
+    return { concretePeakStrain:f=>interp(f,state.strainProfile==='Ec3'?peak3:peak2),
+      concreteUltimateStrain:f=>interp(f,ultimate), concreteParabolicExponent:f=>interp(f,exponent),
+      concreteEffectiveStrengthFactor:f=>interp(f,eta) };
+  }
+
+  // Concrete fibres of about state.fiber mm in each direction (core enforces at least 8 per side)
+  const fiberCounts = () => state.fiberMode === 'count'
+    ? { nx: Math.max(8, Math.round(state.fiberNx)), ny: Math.max(8, Math.round(state.fiberNy)) }
+    : { nx: Math.max(8, Math.ceil(state.b / state.fiber)), ny: Math.max(8, Math.ceil(state.h / state.fiber)) };
+  async function runSolve() {
+    const problem = validate();
+    if (problem) { setStatus(problem, true); showInvalid(problem); return; }
+    const id = ++runSeq;
+    setStatus('Solving…', false, true);
+    try {
+    const input = {
+      codeOptions: { alphaCc: state.alphaCc, strainProfile: state.strainProfile },
+      settings: { fiberCountX: fiberCounts().nx, fiberCountY: fiberCounts().ny },
+      section: { b: state.b, h: state.h, bars: state.bars.map((r) => ({ x: r.x, y: r.y, area: barByName(r.bar).area })) },
+      concrete: { fc: state.fc }, steel: { fy: state.fy, es: state.es },
+      demands: (lastDesign = await designLoads()).map((l) => ({ name: l.name, pu: l.p * 1e3, mux: l.mx * 1e6, muy: l.my * 1e6 })),
+    };
+      const out = await solver.run(input);
+      if (id !== runSeq) return;
+      lastResult = out; renderResults(out);
+      { const fc = fiberCounts(); $('fiberInfo').textContent = `${fc.nx} × ${fc.ny} fibres of ${fmt(state.b / fc.nx, 1)} × ${fmt(state.h / fc.ny, 1)} mm`; }
+      setStatus(`Solved in ${out.elapsedMs} ms · ${solver.mode}${mergeNote ? ` · ${mergeNote[0].toUpperCase()}${mergeNote.slice(1)}` : ''}`); mergeNote = '';
+    } catch (err) {
+      if (id === runSeq) setStatus(`Solver error: ${err.message}`, true);
+    }
+  }
+
+  // ── Results ─────────────────────────────────────────────────────────────────
+  const fmt = (v, d = 0) => Number.isFinite(v) ? (Math.abs(v) < 0.5 * Math.pow(10, -d) ? 0 : v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }) : '∞';
+
+  // Inputs cannot be solved: drop the old results so nothing stale is shown.
+  function showInvalid(problem) {
+    runSeq++; lastResult = null;
+    $('verdict').innerHTML = `<span class="ratio fail">—</span><span class="what error">${escapeHtml(problem)}</span>`;
+    $('resTable').tBodies[0].innerHTML = '';
+    $('surfaceInfo').textContent = '';
+    ['pmChart', 'mmChart', 'pmm3d'].forEach((id) => { const { w, h, g } = resizeCanvas($(id)); g.clearRect(0, 0, w, h); });
+    ['pmCaption', 'mmCaption', 'pmm3dCaption'].forEach((id) => { $(id).textContent = ''; });
+    $('pmm3dCaption').textContent = 'No results: the section is not valid.';
+  }
+
+  function renderResults(out) {
+    const rows = out.results.map((r, i) => {
+      const cls = r.pass ? 'pass' : 'fail', cap = r.capacity;
+      return `<tr${i === out.govIndex ? ' class="gov"' : ''}>
+        <td>${escapeHtml(r.name)}</td><td>${fmt(r.ratio, 3)}</td>
+        <td><span class="tag ${cls}">${r.pass ? 'OK' : 'Fails'}</span></td>
+        <td>${r.thetaDeg != null ? fmt(r.thetaDeg, 1) : '–'}</td>
+        <td>${cap ? fmt(cap.pn / 1e3) : '–'}</td>
+        <td>${cap ? fmt(Math.hypot(cap.mnx, cap.mny) / 1e6) : '–'}</td></tr>`;
+    }).join('');
+    $('resTable').tBodies[0].innerHTML = rows;
+    $('slResults').hidden = !lastSlender;
+    if (lastSlender) {
+      const ax = (a) => a ? `<span${a.slender ? ' class="tag fail" style="font-weight:600"' : ''}>${fmt(a.lambda, 1)} / ${Number.isFinite(a.lambdaLim) ? fmt(a.lambdaLim, 1) : '—'}</span>` : '—';
+      $('slTable').tBodies[0].innerHTML = lastSlender.map((sv, i) => `<tr${i === out.govIndex ? ' class="gov"' : ''}>
+        <td>${escapeHtml(state.loads[i].name)}</td><td>${ax(sv.x)}</td><td>${ax(sv.y)}</td>
+        <td style="text-align:left;font-family:Barlow,sans-serif;font-size:12.5px">${escapeHtml(sv.status)}</td>
+        <td>${fmt(sv.mxEd / 1e6, 1)}</td><td>${fmt(sv.myEd / 1e6, 1)}</td></tr>`).join('');
+      const w = [...new Set(lastSlender.flatMap((sv) => sv.warnings))];
+      $('slCaption').textContent = `l0,x = ${fmt(state.slender.kx * state.slender.L)} mm, l0,y = ${fmt(state.slender.ky * state.slender.L)} mm, ${state.slender.braced ? 'braced' : 'unbraced'}. Design moments include imperfection (l0/400), minimum eccentricity and M2 where slender; the D/C check uses them.` + (w.length ? ' ' + w.join(' ') : '');
+    }
+    const v = $('verdict');
+    if (out.govIndex >= 0) {
+      const g = out.results[out.govIndex];
+      v.innerHTML = `<span class="ratio ${g.pass ? 'pass' : 'fail'}">${fmt(g.ratio, 3)}</span>
+        <span class="what">${g.pass ? 'Section is adequate' : 'Section fails'} — governing case ${escapeHtml(g.name)}</span>`;
+    } else {
+      v.innerHTML = '<span class="what">Add a load case to check the section.</span>';
+    }
+    const sm = out.summary;
+    $('surfaceInfo').textContent = `NRd range ${fmt(sm.phiPnMin / 1e3)} to ${fmt(sm.phiPnMax / 1e3)} kN · ${sm.angleCount} angles × ${sm.depthCount} depths`;
+    drawCharts(); draw3d(); drawMomentDiagrams();
+  }
+
+  // Line with an arrowhead at (x2, y2). double = two heads: a moment vector (right-hand rule).
+  function arrow(g, x1, y1, x2, y2, color, width, double) {
+    const a = Math.atan2(y2 - y1, x2 - x1), hl = 7 + width, hw = 3.5 + width * 0.6;
+    g.strokeStyle = color; g.fillStyle = color; g.lineWidth = width; g.setLineDash([]);
+    g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+    const head = (tx, ty) => {
+      g.beginPath(); g.moveTo(tx, ty);
+      g.lineTo(tx - hl * Math.cos(a) + hw * Math.sin(a), ty - hl * Math.sin(a) - hw * Math.cos(a));
+      g.lineTo(tx - hl * Math.cos(a) - hw * Math.sin(a), ty - hl * Math.sin(a) + hw * Math.cos(a));
+      g.closePath(); g.fill();
+    };
+    head(x2, y2);
+    if (double) head(x2 - (hl * 0.8) * Math.cos(a), y2 - (hl * 0.8) * Math.sin(a));
+  }
+  const SIGN_NOTE = '+Mx compresses the −Y face, +My the +X face (moment vectors by right-hand rule); P compression positive.';
+
+  function axes(g, w, h, pad, xr, yr, xl, yl, xStep, yStep) {
+    const ink2 = css('--ink-2'), rule = css('--rule');
+    const X = (x) => pad.l + (x - xr[0]) / (xr[1] - xr[0]) * (w - pad.l - pad.r);
+    const Y = (y) => h - pad.b - (y - yr[0]) / (yr[1] - yr[0]) * (h - pad.t - pad.b);
+    g.font = '400 11.5px "Barlow Semi Condensed", sans-serif'; g.fillStyle = ink2; g.lineWidth = 1;
+    const ticks = (lo, hi, user) => {
+      const span = hi - lo, step0 = Math.pow(10, Math.floor(Math.log10(span / 5)));
+      // a user step is used unless it would draw an unreadable number of lines
+      const step = user > 0 && span / user <= 40 ? user : [1, 2, 5, 10].map((m) => m * step0).find((s) => span / s <= 6);
+      const out = []; for (let t = Math.ceil(lo / step - 1e-9) * step; t <= hi + 1e-9; t += step) out.push(Math.abs(t) < step * 1e-9 ? 0 : t);
+      out.step = step; return out;
+    };
+    // label every n-th line, counted from zero, so 0 always carries a label and labels never crowd it
+    const labelled = (list) => { const ev = Math.max(1, Math.ceil(list.length / 8)); return (t) => Math.round(t / list.step) % ev === 0; };
+    g.strokeStyle = rule;
+    { const tx = ticks(xr[0], xr[1], xStep), lab = labelled(tx); tx.forEach((t) => { g.globalAlpha = t === 0 ? 1 : 0.6; g.beginPath(); g.moveTo(X(t), pad.t); g.lineTo(X(t), h - pad.b); g.stroke(); g.globalAlpha = 1; if (lab(t)) { g.textAlign = 'center'; g.fillText(fmt(t), X(t), h - pad.b + 14); } }); }
+    { const ty = ticks(yr[0], yr[1], yStep), lab = labelled(ty); ty.forEach((t) => { g.globalAlpha = t === 0 ? 1 : 0.6; g.beginPath(); g.moveTo(pad.l, Y(t)); g.lineTo(w - pad.r, Y(t)); g.stroke(); g.globalAlpha = 1; if (lab(t)) { g.textAlign = 'right'; g.fillText(fmt(t), pad.l - 6, Y(t) + 4); } }); }
+    g.textAlign = 'right'; g.fillText(xl, w - 4, h - 4);
+    g.textAlign = 'left'; g.fillText(yl, 4, 12);
+    return { X, Y };
+  }
+  const range = (vals, padFrac) => { let lo = Math.min(...vals), hi = Math.max(...vals); const p = (hi - lo || 1) * padFrac; return [lo - p, hi + p]; };
+
+  function drawCharts() {
+    const out = lastResult; if (!out) return;
+    const ink = css('--ink'), steel = css('--steel'), amber = css('--amber'), ink2 = css('--ink-2');
+    // top and right margins hold the axis arrows' labels, outside the plotting area
+    const pad = { l: 52, r: 52, t: 36, b: 30 };
+    const gStep = (v) => { const n = parseFloat(v); return n > 0 ? n : 0; };
+
+    // P–M
+    { const { w, h, g } = resizeCanvas($('pmChart')); g.clearRect(0, 0, w, h);
+      const c = out.pm.curve.map((q) => ({ m: q.m / 1e6, p: q.p / 1e3 }));
+      const th = out.pm.thetaDeg * Math.PI / 180;
+      const dem = lastDesign.map((l, i) => ({ m: Math.hypot(l.mx, l.my), p: l.p, gov: i === out.govIndex }));
+      if (c.length) {
+        const xr = [0, range([...c.map((q) => q.m), ...dem.map((d) => d.m)], 0.08)[1]];
+        const yr = range([...c.map((q) => q.p), ...dem.map((d) => d.p)], 0.08);
+        const { X, Y } = axes(g, w, h, pad, xr, yr, 'M (kNm)', 'P (kN)', gStep(state.chartGrid.pmM), gStep(state.chartGrid.pmP));
+        g.strokeStyle = steel; g.lineWidth = 2; g.beginPath();
+        c.forEach((q, i) => (i ? g.lineTo(X(q.m), Y(q.p)) : g.moveTo(X(q.m), Y(q.p)))); g.stroke();
+        // axis convention: +P (compression) up, +M along θ to the right
+        const apc = css('--axis-p');
+        arrow(g, X(0), Y(yr[0]), X(0), pad.t - 18, apc, 1.5, false);
+        arrow(g, X(0), Y(0), w - 8, Y(0), ink, 1.5, true);
+        g.font = '600 11.5px "Barlow Semi Condensed", sans-serif';
+        g.fillStyle = apc; g.textAlign = 'left'; g.fillText('+P compression', X(0) + 8, pad.t - 16);
+        g.fillStyle = ink; g.textAlign = 'right'; g.fillText('+M', w - 4, Y(0) - 8);
+        g.fillStyle = ink2; g.font = '500 11px "Barlow Semi Condensed", sans-serif'; g.fillText(`θ ${fmt(out.pm.thetaDeg, 0)}°`, w - 4, Y(0) + 16); g.textAlign = 'left';
+        dem.forEach((d) => { g.fillStyle = d.gov ? amber : ink2; g.beginPath(); g.arc(X(d.m), Y(d.p), d.gov ? 5 : 3.5, 0, Math.PI * 2); g.fill();
+          if (d.gov) { g.strokeStyle = ink; g.lineWidth = 1; g.stroke(); } });
+      }
+      $('pmCaption').textContent = `Moment direction θ = ${fmt(out.pm.thetaDeg, 1)}°, measured from +Mx toward +My. Demands plotted at their resultant moment; the governing case lies on this plane.`;
+    }
+
+    // Mx–My
+    { const { w, h, g } = resizeCanvas($('mmChart')); g.clearRect(0, 0, w, h);
+      const c = out.mm.curve.map((q) => ({ x: q.mx / 1e6, y: q.my / 1e6 }));
+      const gl = lastDesign[out.govIndex];
+      if (c.length) {
+        const lim = Math.max(...c.map((q) => Math.max(Math.abs(q.x), Math.abs(q.y))), gl ? Math.max(Math.abs(gl.mx), Math.abs(gl.my)) : 0) * 1.1;
+        const side = Math.min(w - pad.l - pad.r, h - pad.t - pad.b);
+        const padSq = { l: pad.l, r: w - pad.l - side, t: pad.t, b: h - pad.t - side };
+        const { X, Y } = axes(g, w, h, padSq, [-lim, lim], [-lim, lim], 'Mx (kNm)', 'My (kNm)', gStep(state.chartGrid.mm), gStep(state.chartGrid.mm));
+        g.strokeStyle = steel; g.lineWidth = 2; g.beginPath();
+        c.forEach((q, i) => (i ? g.lineTo(X(q.x), Y(q.y)) : g.moveTo(X(q.x), Y(q.y)))); g.closePath(); g.stroke();
+        // axis convention: moment vectors (double heads), θ counter-clockwise from +Mx
+        const axc = css('--axis-x'), ayc = css('--axis-y');
+        arrow(g, X(-lim), Y(0), X(lim) + 34, Y(0), axc, 1.5, true);
+        arrow(g, X(0), Y(-lim), X(0), Y(lim) - 22, ayc, 1.5, true);
+        g.font = '600 11.5px "Barlow Semi Condensed", sans-serif';
+        g.fillStyle = axc; g.textAlign = 'right'; g.fillText('+Mx', X(lim) + 36, Y(0) + 16);
+        g.fillStyle = ayc; g.textAlign = 'left'; g.fillText('+My', X(0) + 8, Y(lim) - 14);
+        if (gl && (gl.mx || gl.my)) {
+          const thg = Math.atan2(gl.my, gl.mx), r0 = 26;
+          g.strokeStyle = amber; g.lineWidth = 1.25; g.beginPath();
+          g.arc(X(0), Y(0), r0, 0, -(thg < 0 ? thg + 2 * Math.PI : thg), true); g.stroke();
+          const tA = thg < 0 ? thg + 2 * Math.PI : thg, hx = X(0) + r0 * Math.cos(tA), hy = Y(0) - r0 * Math.sin(tA);
+          arrow(g, hx + 6 * Math.sin(tA), hy + 6 * Math.cos(tA), hx, hy, amber, 1.25, false);
+          g.fillStyle = amber; g.fillText('θ', X(0) + (r0 + 8) * Math.cos(tA / 2), Y(0) - (r0 + 8) * Math.sin(tA / 2) + 4);
+        }
+        g.textAlign = 'left';
+        if (gl) { g.fillStyle = amber; g.strokeStyle = ink; g.lineWidth = 1; g.beginPath(); g.arc(X(gl.mx), Y(gl.my), 5, 0, Math.PI * 2); g.fill(); g.stroke(); }
+        $('mmCaption').textContent = `Contour at P = ${fmt(out.mm.pu / 1e3)} kN${gl ? ` (${gl.name})` : ''}. ${SIGN_NOTE}`;
+      } else {
+        g.fillStyle = ink2; g.font = '400 13px Barlow, sans-serif'; g.fillText('This axial load is outside the section capacity.', 12, 40);
+        $('mmCaption').textContent = '';
+      }
+    }
+  }
+
+  // ── Moment along the column height (first order, imperfection, second order) ──
+  let slCaseSel = -1;
+  $('slCase').addEventListener('change', (e) => { slCaseSel = +e.target.value; drawMomentDiagrams(); });
+  function drawMomentDiagrams() {
+    const cvs = $('slDiagram'); if (!lastSlender || !lastResult) return;
+    const i = slCaseSel >= 0 && slCaseSel < lastSlender.length ? slCaseSel : lastResult.govIndex;
+    $('slCase').innerHTML = state.loads.map((l, k) => `<option value="${k}"${k === i ? ' selected' : ''}>${escapeHtml(l.name)}${k === lastResult.govIndex ? ' (governing)' : ''}</option>`).join('');
+    const { w, h, g } = resizeCanvas(cvs); g.clearRect(0, 0, w, h);
+    const sv = lastSlender[i], l = state.loads[i];
+    const ink = css('--ink'), ink2 = css('--ink-2'), rule = css('--rule'), amber = css('--amber'), steel = css('--steel'), fail = css('--fail');
+    if (!sv.applicable) { g.fillStyle = ink2; g.font = '400 13px Barlow, sans-serif'; g.fillText('NEd is not compressive: no slenderness effects for this case.', 10, 30); $('slDiagCaption').textContent = ''; return; }
+    const braced = state.slender.braced, num = '"Barlow Semi Condensed", sans-serif';
+    // Prokon-style rows: first order (as entered, + imperfection) | second order M2 | design = sum
+    const rows = [
+      { name: 'Mx', color: css('--axis-x'), top: l.mx, bot: l.mxb ?? l.mx, r: sv.x },
+      { name: 'My', color: css('--axis-y'), top: l.my, bot: l.myb ?? l.my, r: sv.y },
+    ];
+    const rowH = h / 2, labelW = 34, colW = (w - labelW) / 3, minNotes = [];
+    const fillOf = (hex, a) => { const c = hexRgb(hex); return `rgba(${c[0]},${c[1]},${c[2]},${a})`; };
+    rows.forEach((rw, ri) => {
+      const r = rw.r, sg = r.sign, Mi = r.Mi / 1e6 * sg, M2 = r.slender ? r.M2 / 1e6 : 0;
+      // first order at top / mid / bottom including the imperfection moment
+      const fTop = rw.top + Mi, fBot = rw.bot + Mi, fMid = (rw.top + rw.bot) / 2 + Mi;
+      // second order: braced → peak at mid-height; unbraced → at the end carrying M02
+      const topIsM02 = Math.abs(rw.top) >= Math.abs(rw.bot);
+      const sTop = braced ? 0 : (topIsM02 ? sg * M2 : 0), sBot = braced ? 0 : (topIsM02 ? 0 : sg * M2), sMid = braced ? sg * M2 : sg * M2 / 2;
+      // design: EC2 §5.8.8.2 — braced mid-height uses the equivalent M0e (+ M2); ends keep their first-order values
+      let dTop = fTop + sTop, dBot = fBot + sBot, dMid;
+      if (braced && r.slender) dMid = sg * (r.M0e / 1e6 + M2);
+      else dMid = fMid + sMid;
+      const MEd = r.MEd / 1e6, Mmin = r.Mmin / 1e6;
+      // EC2 §6.1(4): no section is designed for less than NEd·e0 — lift any smaller value to it
+      const lifted = []; minNotes[ri] = lifted;
+      const atLeast = (m, where) => { if (Math.abs(m) < Mmin) { lifted.push(where); return (m === 0 ? sg : Math.sign(m)) * Mmin; } return m; };
+      dBot = atLeast(dBot, 'bottom'); dMid = atLeast(dMid, 'mid-height'); dTop = atLeast(dTop, 'top');
+      const diagrams = [
+        { title: 'First order', vals: [fBot, fMid, fTop], color: ink, fill: fillOf(ink2, 0.10), note: `+ N·ei ${fmt(Math.abs(Mi), 1)}` },
+        { title: 'Second order M2', vals: [sBot, sMid, sTop], color: fail, fill: fillOf(fail, 0.10), note: `λ ${fmt(r.lambda, 1)} ${r.slender ? '≥' : '<'} ${Number.isFinite(r.lambdaLim) ? fmt(r.lambdaLim, 1) : '∞'}` },
+        { title: 'Design', vals: [dBot, dMid, dTop], color: steel, fill: fillOf(steel, 0.16), note: `MEd ${fmt(MEd, 1)}${r.governs === 'NEd·e0' ? ' = N·e0' : ''}` },
+      ];
+      const lim = Math.max(1, ...diagrams.flatMap((d) => d.vals.map(Math.abs)), Math.abs(MEd), Mmin) * 1.08;
+      const y0 = ri * rowH, top = y0 + 30, bot = y0 + rowH - 34, Y = (t) => bot - t * (bot - top);
+      // row label
+      g.save(); g.translate(14, (top + bot) / 2); g.rotate(-Math.PI / 2); g.textAlign = 'center';
+      g.font = `600 13px Barlow, sans-serif`; g.fillStyle = rw.color; g.fillText(`${rw.name} (kNm)`, 0, 4); g.restore();
+      if (ri > 0) { g.strokeStyle = rule; g.lineWidth = 1; g.beginPath(); g.moveTo(0, y0 + 0.5); g.lineTo(w, y0 + 0.5); g.stroke(); }
+      diagrams.forEach((d, ci) => {
+        const cx0 = labelW + ci * colW, half = colW / 2 - 40, axisX = cx0 + colW / 2, X = (m) => axisX + m / lim * half;
+        g.font = '600 12px Barlow, sans-serif'; g.fillStyle = ci === 2 ? steel : ink; g.textAlign = 'center';
+        g.fillText(d.title, axisX, y0 + 16);
+        if (ci < 2) { g.fillStyle = ink2; g.font = '600 15px Barlow, sans-serif'; g.fillText(ci === 0 ? '+' : '=', cx0 + colW, y0 + 16); }
+        // column line
+        g.strokeStyle = ink; g.lineWidth = 2; g.beginPath(); g.moveTo(axisX, Y(0)); g.lineTo(axisX, Y(1)); g.stroke();
+        g.lineWidth = 1; g.beginPath(); g.moveTo(axisX - 5, Y(0)); g.lineTo(axisX + 5, Y(0)); g.moveTo(axisX - 5, Y(1)); g.lineTo(axisX + 5, Y(1)); g.stroke();
+        // diagram: bottom → mid → top, closed back along the column (half-sine between nodes for braced M2)
+        const pts = [];
+        const n = 24;
+        for (let j = 0; j <= n; j++) {
+          const t = j / n;
+          let m;
+          if (ci === 1 && braced) m = d.vals[1] * Math.sin(Math.PI * t);
+          else if (ci === 1) m = d.vals[0] + (d.vals[2] - d.vals[0]) * t;
+          else m = t <= 0.5 ? d.vals[0] + (d.vals[1] - d.vals[0]) * (t / 0.5) : d.vals[1] + (d.vals[2] - d.vals[1]) * ((t - 0.5) / 0.5);
+          pts.push([X(m), Y(t)]);
+        }
+        g.beginPath(); g.moveTo(axisX, Y(0)); pts.forEach(([px, py]) => g.lineTo(px, py)); g.lineTo(axisX, Y(1)); g.closePath();
+        g.fillStyle = d.fill; g.fill();
+        g.beginPath(); pts.forEach(([px, py], j) => (j ? g.lineTo(px, py) : g.moveTo(px, py)));
+        g.strokeStyle = d.color; g.lineWidth = ci === 2 ? 2 : 1.5; g.stroke();
+        // values at top, mid-height and bottom
+        g.font = `500 11px ${num}`; g.fillStyle = d.color;
+        const lab = (m, t, dy) => { if (Math.abs(m) < 0.05 && ci === 1) return; g.textAlign = m >= 0 ? 'left' : 'right'; g.fillText(fmt(m, 1), X(m) + (m >= 0 ? 4 : -4), Y(t) + dy); };
+        lab(d.vals[2], 1, 11); lab(d.vals[1], 0.5, 4); lab(d.vals[0], 0, -3);
+        if (ci === 2) {
+          // governing design moment and the minimum N·e0 bound
+          g.strokeStyle = amber; g.lineWidth = 1.25; g.setLineDash([4, 3]);
+          g.beginPath(); g.moveTo(X(MEd), Y(0)); g.lineTo(X(MEd), Y(1)); g.stroke();
+          g.strokeStyle = rule; g.beginPath(); [sg * Mmin].forEach((m) => { g.moveTo(X(m), Y(0)); g.lineTo(X(m), Y(1)); }); g.stroke(); g.setLineDash([]);
+        }
+        g.font = `400 11px ${num}`; g.fillStyle = ci === 2 ? amber : ink2; g.textAlign = 'center';
+        g.fillText(d.note, axisX, y0 + rowH - 12);
+      });
+    });
+    g.textAlign = 'left';
+    const minTxt = rows.map((rw, ri) => (minNotes[ri] && minNotes[ri].length ? `${rw.name}: design lifted to the minimum N·e0 = ${fmt(rw.r.Mmin / 1e6, 1)} kNm (e0 = ${fmt(rw.r.e0, 1)} mm, EC2 §6.1(4)) at ${minNotes[ri].join(', ')}.` : '')).filter(Boolean).join(' ');
+    $('slDiagCaption').textContent = (minTxt ? minTxt + ' ' : '') + `Prokon-style breakdown for ${l.name}: first order = entered end moments plus the imperfection N·l0/400; second order M2 ${braced ? 'peaks at mid-height (braced)' : 'acts at the end with M02 (unbraced)'}; design = sum, with the braced mid-height value taken as M0e + M2 (EC2 §5.8.8.2). Amber dashed: MEd used in the capacity check; grey dashed: minimum N·e0.`;
+  }
+
+  // ── 3D PMM surface ──────────────────────────────────────────────────────────
+  const cv3 = $('pmm3d');
+  const view3d = { yaw: -0.8, pitch: 0.38, zoom: 1 };
+  const hexRgb = (h) => { const m = /^#?([0-9a-f]{6})$/i.exec(h.trim()); const n = m ? parseInt(m[1], 16) : 0x2B3A8C; return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+  let raf3d = 0;
+  const request3d = () => { if (!raf3d) raf3d = requestAnimationFrame(() => { raf3d = 0; draw3d(); }); };
+
+  function draw3d() {
+    const { w, h, g } = resizeCanvas(cv3); g.clearRect(0, 0, w, h);
+    const out = lastResult; if (!out || !out.mesh) return;
+    const { angleCount: A, depthCount: D, xyz } = out.mesh;
+    const ink = css('--ink'), ink2 = css('--ink-2'), amber = css('--amber');
+    const paper = hexRgb(css('--sheet')), meshC = hexRgb(css('--mesh'));
+
+    // Normalise: moments by the largest resultant, P by its range (P is ~10× M in magnitude).
+    let mMax = 0, pMax = -Infinity, pMin = Infinity;
+    for (let k = 0; k < xyz.length; k += 3) {
+      mMax = Math.max(mMax, Math.hypot(xyz[k], xyz[k + 1]));
+      pMax = Math.max(pMax, xyz[k + 2]); pMin = Math.min(pMin, xyz[k + 2]);
+    }
+    mMax = mMax || 1;
+    const pMid = (pMax + pMin) / 2, pHalf = (pMax - pMin) / 2 || 1, zs = 1.1;
+    const N = (mx, my, p) => [mx / mMax, my / mMax, (p - pMid) / pHalf * zs];
+
+    const cyw = Math.cos(view3d.yaw), syw = Math.sin(view3d.yaw), cp = Math.cos(view3d.pitch), sp = Math.sin(view3d.pitch);
+    const S = Math.min(w, h * 1.15) * 0.3 * view3d.zoom;
+    const P = ([x, y, z]) => {
+      const u = x * cyw - y * syw, d = x * syw + y * cyw;
+      return [w / 2 + u * S, h / 2 - (z * cp + d * sp) * S, d * cp - z * sp];
+    };
+    // P-level resampling, as the desktop app does (DiagramDataService.BuildPLevelSurfaceMesh):
+    // sort each angle's curve by P, then interpolate Mx, My at evenly spaced P levels,
+    // so every ring of the mesh is a true constant-P contour.
+    const curves = [];
+    for (let a = 0; a < A; a++) {
+      const c = [];
+      for (let d = 0; d < D; d++) { const k = (a * D + d) * 3; c.push([xyz[k], xyz[k + 1], xyz[k + 2]]); }
+      c.sort((q1, q2) => q1[2] - q2[2]);
+      curves.push(c);
+    }
+    const atP = (c, pt) => {
+      if (pt <= c[0][2]) return [c[0][0], c[0][1]];
+      if (pt >= c[c.length - 1][2]) return [c[c.length - 1][0], c[c.length - 1][1]];
+      for (let i = 0; i < c.length - 1; i++) {
+        const pa = c[i][2], pb = c[i + 1][2];
+        if (pa <= pt && pb >= pt) {
+          const t = Math.abs(pb - pa) < 1e-9 ? 0 : (pt - pa) / (pb - pa);
+          return [c[i][0] + (c[i + 1][0] - c[i][0]) * t, c[i][1] + (c[i + 1][1] - c[i][1]) * t];
+        }
+      }
+      return [c[c.length - 1][0], c[c.length - 1][1]];
+    };
+    const levels = Math.max(8, Math.min(120, Math.round(+$('p3dLevels').value) || 40));
+    const ring = (pt) => curves.map((c) => { const m = atP(c, pt); return N(m[0], m[1], pt); });
+    const rings = [];
+    for (let r = 0; r < levels; r++) rings.push(ring(pMin + (pMax - pMin) * r / (levels - 1)));
+
+    // Translucent faces between neighbouring rings, back to front.
+    const quads = [], L = [0.35, -0.55, 0.76];
+    for (let r = 0; r < levels - 1; r++) {
+      for (let a = 0; a < A; a++) {
+        const na = (a + 1) % A;
+        const v = [rings[r][a], rings[r][na], rings[r + 1][na], rings[r + 1][a]];
+        const e1 = [v[2][0] - v[0][0], v[2][1] - v[0][1], v[2][2] - v[0][2]];
+        const e2 = [v[3][0] - v[1][0], v[3][1] - v[1][1], v[3][2] - v[1][2]];
+        let n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+        const nl = Math.hypot(...n) || 1; n = n.map((c) => c / nl);
+        const pr = v.map(P);
+        quads.push({ pr, depth: (pr[0][2] + pr[1][2] + pr[2][2] + pr[3][2]) / 4, shade: Math.abs(n[0] * L[0] + n[1] * L[1] + n[2] * L[2]) });
+      }
+    }
+    quads.sort((q1, q2) => q2.depth - q1.depth);
+    for (const q of quads) {
+      const k = 0.35 + 0.55 * q.shade;
+      const c = paper.map((pc, i) => Math.round(pc * (1 - k) + meshC[i] * k));
+      g.beginPath(); g.moveTo(q.pr[0][0], q.pr[0][1]);
+      for (let i = 1; i < 4; i++) g.lineTo(q.pr[i][0], q.pr[i][1]);
+      g.closePath(); g.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},0.16)`; g.fill();
+    }
+
+    // Lines: light-blue dotted P-level rings, fainter meridians; far-side segments fade.
+    const pts = rings.map((rg) => rg.map(P));
+    let dMin = Infinity, dMax = -Infinity;
+    for (const rg of pts) for (const q of rg) { dMin = Math.min(dMin, q[2]); dMax = Math.max(dMax, q[2]); }
+    const near = (q1, q2) => 1 - ((q1[2] + q2[2]) / 2 - dMin) / ((dMax - dMin) || 1); // 1 = front
+    // Draw a polyline as front/back runs so the dash pattern stays continuous along each run.
+    const poly = (list, closed, frontAlpha, backAlpha, width, color, dash) => {
+      g.lineWidth = width; g.setLineDash(dash);
+      const n = closed ? list.length : list.length - 1;
+      let run = null;
+      const flush = () => { if (run) { g.strokeStyle = `rgba(${color[0]},${color[1]},${color[2]},${run.front ? frontAlpha : backAlpha})`; g.stroke(); run = null; } };
+      for (let i = 0; i < n; i++) {
+        const q1 = list[i], q2 = list[(i + 1) % list.length], front = near(q1, q2) > 0.5;
+        if (!run || run.front !== front) { flush(); run = { front }; g.beginPath(); g.moveTo(q1[0], q1[1]); }
+        g.lineTo(q2[0], q2[1]);
+      }
+      flush(); g.setLineDash([]);
+    };
+    if ($('show3dMesh').checked) {
+      for (let a = 0; a < A; a += 3) poly(pts.map((rg) => rg[a]), false, 0.35, 0.12, 0.5, meshC, [1.5, 3]);
+    }
+    for (let r = 0; r < levels; r++) poly(pts[r], true, 0.9, 0.3, 0.75, meshC, [2, 2.5]);
+
+
+    // Horizontal plane through a P level (governing P unless the user sets one)
+    const govL = lastDesign[out.govIndex];
+    const planeIn = parseFloat($('p3dPlane').value);
+    const planeP = Number.isFinite(planeIn) ? planeIn * 1e3 : (govL ? govL.p * 1e3 : NaN);
+    const am = hexRgb(amber);
+    if (Number.isFinite(planeP) && planeP > pMin && planeP < pMax) {
+      const zp = N(0, 0, planeP)[2], e = 1.25;
+      const corners = [[-e, -e, zp], [e, -e, zp], [e, e, zp], [-e, e, zp]].map(P);
+      g.beginPath(); corners.forEach((q, i) => (i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]))); g.closePath();
+      g.fillStyle = `rgba(${am[0]},${am[1]},${am[2]},0.045)`; g.fill();
+      g.strokeStyle = `rgba(${am[0]},${am[1]},${am[2]},0.3)`; g.lineWidth = 0.75; g.stroke();
+      // the capacity contour where the plane cuts the surface
+      poly(ring(planeP).map(P), true, 1, 0.45, 1.75, am, []);
+      g.font = '500 12.5px "Barlow Semi Condensed", sans-serif';
+      g.fillStyle = amber; g.textAlign = 'left';
+      const rc = corners.reduce((m, q) => (q[0] > m[0] ? q : m));
+      g.fillText(`P = ${fmt(planeP / 1e3)} kN`, rc[0] + 6, rc[1] + 4);
+    }
+
+    // Axes through the origin (P = 0, M = 0)
+    const z0 = N(0, 0, 0);
+    const line3 = (a, b, color, width, dash) => {
+      const pa = P(a), pb = P(b);
+      g.strokeStyle = color; g.lineWidth = width; g.setLineDash(dash || []);
+      g.beginPath(); g.moveTo(pa[0], pa[1]); g.lineTo(pb[0], pb[1]); g.stroke(); g.setLineDash([]);
+    };
+    const label3 = (pt, text, color, align) => { const pp = P(pt); g.fillStyle = color; g.textAlign = align || 'center'; g.fillText(text, pp[0], pp[1]); g.textAlign = 'left'; };
+    g.font = '500 12.5px "Barlow Semi Condensed", sans-serif';
+    const ax = css('--axis-x'), ay = css('--axis-y'), ap = css('--axis-p');
+    const arrow3 = (a, b, color, dbl) => { const pa = P(a), pb = P(b); arrow(g, pa[0], pa[1], pb[0], pb[1], color, 1.5, dbl); };
+    line3([-1.2, 0, z0[2]], [0, 0, z0[2]], ax, 1.5); arrow3([0, 0, z0[2]], [1.2, 0, z0[2]], ax, true);
+    line3([0, -1.2, z0[2]], [0, 0, z0[2]], ay, 1.5); arrow3([0, 0, z0[2]], [0, 1.2, z0[2]], ay, true);
+    line3([0, 0, -zs * 1.08], [0, 0, z0[2]], ap, 1.5); arrow3([0, 0, z0[2]], [0, 0, zs * 1.1], ap, false);
+    g.font = '600 12.5px "Barlow Semi Condensed", sans-serif';
+    label3([1.34, 0, z0[2]], `+Mx ${fmt(mMax / 1e6)} kNm`, ax);
+    label3([0, 1.34, z0[2]], `+My ${fmt(mMax / 1e6)} kNm`, ay);
+    label3([0, 0, zs * 1.2], `+P ${fmt(pMax / 1e3)} kN (compression)`, ap);
+    label3([0, 0, -zs * 1.26], `${fmt(pMin / 1e3)} kN`, ap);
+    g.font = '500 12.5px "Barlow Semi Condensed", sans-serif';
+
+    // Load cases, and the governing case's ray to the surface
+    const showAll = $('show3dCases').checked;
+    lastDesign.forEach((l, i) => {
+      const gov = i === out.govIndex;
+      if (!gov && !showAll) return;
+      const pt = P(N(l.mx * 1e6, l.my * 1e6, l.p * 1e3));
+      if (gov) {
+        const cap = out.results[i] && out.results[i].capacity;
+        if (cap) {
+          line3(z0, N(cap.mnx, cap.mny, cap.pn), amber, 1.5, [5, 4]);
+          const cp3 = P(N(cap.mnx, cap.mny, cap.pn));
+          g.strokeStyle = amber; g.lineWidth = 2; g.beginPath(); g.arc(cp3[0], cp3[1], 6, 0, Math.PI * 2); g.stroke();
+        }
+        g.fillStyle = amber; g.strokeStyle = ink; g.lineWidth = 1;
+        g.beginPath(); g.arc(pt[0], pt[1], 5.5, 0, Math.PI * 2); g.fill(); g.stroke();
+        g.fillStyle = ink; g.fillText(l.name, pt[0] + 9, pt[1] - 6);
+      } else {
+        g.fillStyle = ink2; g.beginPath(); g.arc(pt[0], pt[1], 3.5, 0, Math.PI * 2); g.fill();
+      }
+    });
+
+    const gr = out.results[out.govIndex];
+    $('pmm3dCaption').textContent = `${SIGN_NOTE} ${levels} P levels resampled from ${A} angles × ${D} depths. Amber plane: P level (governing unless set) and its capacity contour. Moments scaled to MRd,max ${fmt(mMax / 1e6)} kNm, P to its range.`
+      + (gr && gr.capacity ? ` Dashed ray: governing case ${gr.name} from the origin to the surface, D/C ${fmt(gr.ratio, 3)}.` : '');
+  }
+
+  {
+    let drag3 = null;
+    cv3.tabIndex = 0;
+    cv3.addEventListener('pointerdown', (e) => { drag3 = { x: e.clientX, y: e.clientY }; cv3.setPointerCapture(e.pointerId); });
+    cv3.addEventListener('pointermove', (e) => {
+      if (!drag3) return;
+      view3d.yaw += (e.clientX - drag3.x) * 0.01;
+      view3d.pitch = Math.max(-1.45, Math.min(1.45, view3d.pitch + (e.clientY - drag3.y) * 0.01));
+      drag3 = { x: e.clientX, y: e.clientY }; request3d();
+    });
+    const end3 = () => { drag3 = null; };
+    cv3.addEventListener('pointerup', end3); cv3.addEventListener('pointercancel', end3);
+    cv3.addEventListener('wheel', (e) => { e.preventDefault(); view3d.zoom = Math.max(0.5, Math.min(4, view3d.zoom * Math.exp(-e.deltaY * 0.0015))); request3d(); }, { passive: false });
+    cv3.addEventListener('dblclick', () => { Object.assign(view3d, { yaw: -0.8, pitch: 0.38, zoom: 1 }); request3d(); });
+    cv3.addEventListener('keydown', (e) => {
+      const k = { ArrowLeft: [-0.1, 0], ArrowRight: [0.1, 0], ArrowUp: [0, -0.1], ArrowDown: [0, 0.1] }[e.key];
+      if (!k) return; e.preventDefault();
+      view3d.yaw += k[0]; view3d.pitch = Math.max(-1.45, Math.min(1.45, view3d.pitch + k[1])); request3d();
+    });
+    $('show3dMesh').addEventListener('change', request3d);
+    $('p3dLevels').addEventListener('input', request3d);
+    $('p3dPlane').addEventListener('input', request3d);
+    $('show3dCases').addEventListener('change', request3d);
+  }
+
+  // ── LaTeX (MathJax 3, SVG output; fontCache none so every SVG stands alone) ────
+  let mathJaxReady = null;
+  function loadMathJax() {
+    if (mathJaxReady) return mathJaxReady;
+    // standalone build: MathJax is already inlined and configured
+    if (window.MathJax && window.MathJax.startup && window.MathJax.startup.promise) return (mathJaxReady = window.MathJax.startup.promise.then(() => window.MathJax).catch(() => null));
+    window.MathJax = { startup: { typeset: false }, svg: { fontCache: 'none' }, tex: { packages: { '[+]': [] } } };
+    const tryLoad = (src) => new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = src; sc.async = true; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+    mathJaxReady = tryLoad('vendor/mathjax-tex-svg.js')
+      .catch(() => tryLoad('https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js'))
+      .then(() => window.MathJax.startup.promise).then(() => window.MathJax)
+      .catch(() => null);
+    return mathJaxReady;
+  }
+  // MathML Core (Chrome, Edge, Firefox, Safari) ignores columnalign/columnspacing on <mtable>,
+  // so carry them into CSS on each cell; this keeps the '=' of aligned chains in one column.
+  function fixMml(mml) {
+    const doc = new DOMParser().parseFromString(mml, 'application/xml');
+    doc.querySelectorAll('mtable').forEach((t) => {
+      const al = (t.getAttribute('columnalign') || '').split(/\s+/).filter(Boolean);
+      const sp = (t.getAttribute('columnspacing') || '').split(/\s+/).filter(Boolean);
+      t.querySelectorAll(':scope > mtr, :scope > mlabeledtr').forEach((tr) => {
+        [...tr.children].filter((c) => c.localName === 'mtd').forEach((td, k) => {
+          const a = td.getAttribute('columnalign') || al[Math.min(k, al.length - 1)];
+          const style = [a ? `text-align:${a}` : '', sp.length ? `padding-left:${k ? sp[Math.min(k - 1, sp.length - 1)] : '0'};padding-right:0` : ''].filter(Boolean).join(';');
+          if (style) td.setAttribute('style', style + ';' + (td.getAttribute('style') || ''));
+        });
+      });
+    });
+    return new XMLSerializer().serializeToString(doc.documentElement);
+  }
+  const tex2mml = (MJ, tex, display) => fixMml(MJ.tex2mml(tex, { display: !!display }));
+  const MATH_FONT = `"Cambria Math", "STIX Two Math", "Latin Modern Math", math`;
+  // Typeset the [data-tex] labels once MathJax has loaded; until then the HTML fallback shows.
+  async function typesetLabels() {
+    const MJ = await loadMathJax(); if (!MJ) return;
+    document.querySelectorAll('[data-tex]').forEach((el) => { try { el.innerHTML = tex2mml(MJ, el.dataset.tex, false); } catch (_) {} });
+  }
+  // MathML → JPEG for the PDF: the browser lays the formula out in Cambria Math, then it is drawn
+  // through an SVG foreignObject. Sizes are returned in CSS px at 16 px font size.
+  function mmlToImage(mml, scale) {
+    const k = scale || 3, fs = 16;
+    const host = document.createElement('div');
+    host.style.cssText = `position:absolute;left:-10000px;top:0;white-space:nowrap;font-size:${fs}px;font-family:${MATH_FONT};color:#1F2A30`;
+    host.innerHTML = mml; document.body.appendChild(host);
+    const bb = host.getBoundingClientRect(), w = Math.ceil(bb.width) + 4, h = Math.ceil(bb.height) + 4;
+    const body = new XMLSerializer().serializeToString(host.firstElementChild);
+    host.remove();
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w * k}" height="${h * k}"><foreignObject x="0" y="0" width="${w * k}" height="${h * k}"><div xmlns="http://www.w3.org/1999/xhtml" style="font-size:${fs * k}px;font-family:${MATH_FONT.replace(/"/g, "'")};color:#1F2A30;white-space:nowrap;padding:${2 * k}px">${body}</div></foreignObject></svg>`;
+    return new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => { const c = document.createElement('canvas'); c.width = w * k; c.height = h * k; const g = c.getContext('2d'); g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0); res({ url: c.toDataURL('image/jpeg', 0.92), w, h }); };
+      img.onerror = rej;
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    });
+  }
+
+  // Hand-calculation layout: every formula on its own line, and each chain of '=' broken
+  // into aligned lines (expression / substitution / result). Splits only at the top level,
+  // never inside braces or a \begin…\end environment.
+  function texLines(tex) {
+    // depth over {}, (), [] and \left…\right (incl. \left\| … \right\|), plus \begin…\end
+    const scan = (str, onTop) => {
+      let d = 0;
+      for (let i = 0; i < str.length; i++) {
+        const rest = str.slice(i);
+        if (rest.startsWith('\\begin{') || rest.startsWith('\\left')) { d++; if (rest.startsWith('\\left')) { i += 4; if (str[i + 1] === '\\') i++; i++; continue; } }
+        if (rest.startsWith('\\end{')) d--;
+        if (rest.startsWith('\\right')) { d--; i += 5; if (str[i + 1] === '\\') i++; i++; continue; }
+        const ch = str[i];
+        if (ch === '\\' && /[{}()[\]|,]/.test(str[i + 1] || '')) { const skip = onTop(i, d, rest); if (skip > 0) { i += skip - 1; continue; } i++; continue; }
+        if ('{(['.includes(ch)) d++;
+        if ('})]'.includes(ch)) d--;
+        const skip = onTop(i, d, rest);
+        if (skip > 0) i += skip - 1;
+      }
+    };
+    const parts = []; let last = 0;
+    scan(tex, (i, d, rest) => {
+      if (d !== 0) return 0;
+      const q = /^\\q?quad(?![a-zA-Z])/.exec(rest) || /^,\\ (?=\S)/.exec(rest);
+      if (!q) return 0;
+      parts.push(tex.slice(last, i)); last = i + q[0].length; return q[0].length;
+    });
+    parts.push(tex.slice(last));
+    return parts.map((x) => x.trim().replace(/,$/, '')).filter(Boolean).map((part) => {
+      const eq = [];
+      scan(part, (i, d) => { if (d === 0 && part[i] === '=') eq.push(i); return 0; });
+      if (eq.length < 2) return part;
+      const pieces = [part.slice(0, eq[0])];
+      eq.forEach((at, k) => pieces.push(part.slice(at + 1, k + 1 < eq.length ? eq[k + 1] : undefined)));
+      return String.raw`\begin{aligned} ` + pieces[0].trim() + ' &= ' + pieces.slice(1).map((x) => x.trim()).join(String.raw` \\ &= `) + String.raw` \end{aligned}`;
+    });
+  }
+
+  // Calculation steps for the report, in LaTeX with the numbers substituted.
+  function reportFormulas() {
+    const code = reportDesignCode();
+    const fck = state.fc, ac = state.alphaCc, fcd = ac * fck / 1.5, fyd = state.fy / 1.15, eyd = fyd / state.es;
+    const ec = code.concretePeakStrain(fck) * 1000, ecu = code.concreteUltimateStrain(fck) * 1000, n = code.concreteParabolicExponent(fck), eta = code.concreteEffectiveStrengthFactor(fck);
+    const as = state.bars.reduce((t, r) => t + barByName(r.bar).area, 0), rho = as / (state.b * state.h) * 100;
+    const f = (v, dp) => Number(v).toFixed(dp);
+    const out = [
+      { label: 'Design concrete strength', tex: String.raw`f_{cd} = \frac{\alpha_{cc}\, f_{ck}}{\gamma_c} = \frac{${ac} \times ${fck}}{1.5} = ${f(fcd, 2)}\ \text{MPa}` },
+      { label: 'Design steel strength and yield strain', tex: String.raw`f_{yd} = \frac{f_{yk}}{\gamma_s} = \frac{${state.fy}}{1.15} = ${f(fyd, 1)}\ \text{MPa}, \qquad \varepsilon_{yd} = \frac{f_{yd}}{E_s} = \frac{${f(fyd, 1)}}{${state.es}} = ${f(eyd * 1000, 2)}\,\text{‰}` },
+    ];
+    if (state.strainProfile === 'Ec3') {
+      out.push({ label: 'Concrete stress (bilinear, EC2 Fig. 3.4)', tex: String.raw`\sigma_c = \begin{cases} \eta f_{cd}\, \dfrac{\varepsilon_c}{\varepsilon_{c3}} & 0 \le \varepsilon_c \le \varepsilon_{c3} \\ \eta f_{cd} & \varepsilon_{c3} \le \varepsilon_c \le \varepsilon_{cu3} \end{cases} \qquad \varepsilon_{c3} = ${f(ec, 2)}\,\text{‰},\ \varepsilon_{cu3} = ${f(ecu, 2)}\,\text{‰},\ \eta = ${f(eta, 3)}` });
+    } else {
+      out.push({ label: 'Concrete stress (parabola–rectangle, EC2 Eq. 3.17)', tex: String.raw`\sigma_c = \begin{cases} \eta f_{cd} \left[ 1 - \left( 1 - \dfrac{\varepsilon_c}{\varepsilon_{c2}} \right)^{n} \right] & 0 \le \varepsilon_c \le \varepsilon_{c2} \\ \eta f_{cd} & \varepsilon_{c2} \le \varepsilon_c \le \varepsilon_{cu2} \end{cases} \qquad n = ${f(n, 2)},\ \varepsilon_{c2} = ${f(ec, 2)}\,\text{‰},\ \varepsilon_{cu2} = ${f(ecu, 2)}\,\text{‰},\ \eta = ${f(eta, 3)}` });
+    }
+    out.push(
+      { label: 'Steel stress', tex: String.raw`\sigma_s = E_s\, \varepsilon_s, \qquad -f_{yd} \le \sigma_s \le f_{yd}, \qquad |\varepsilon_s| \le \varepsilon_{ud} = 45\,\text{‰}` },
+      { label: 'Reinforcement ratio', tex: String.raw`A_s = \sum A_{s,j} = ${f(as, 0)}\ \text{mm}^2, \qquad \rho = \frac{A_s}{b\,h} = \frac{${f(as, 0)}}{${state.b} \times ${state.h}} = ${f(rho, 2)}\,\%` },
+    );
+    if (state.bars.some((r) => barByName(r.bar).count > 1)) {
+      out.push({ label: 'Bundled bars (EC2 §8.9.1)', tex: String.raw`\phi_n = \phi \sqrt{n_b}, \qquad A_{s,\text{bundle}} = n_b\, A_{s,\phi}` });
+    }
+    out.push(
+      { label: 'Strain plane for neutral-axis angle θ and depth c (EC2 Fig. 6.1 domains)', tex: String.raw`\varepsilon(x, y) = \varepsilon_{cu} \, \frac{x\cos\theta + y\sin\theta - (p_{\max} - c)}{c}` },
+      { label: 'Section resultants (fibre integration, steel net of displaced concrete)', tex: String.raw`N_{Rd} = \sum_i \sigma_c(\varepsilon_i)\, A_{c,i} + \sum_j \big[\sigma_s(\varepsilon_j) - \sigma_c(\varepsilon_j)\big] A_{s,j}, \qquad M_{Rd,x} = -\sum F\, y, \qquad M_{Rd,y} = \sum F\, x` },
+    );
+    const out2 = lastResult, gr = out2 && out2.results[out2.govIndex], gl = lastDesign[out2 ? out2.govIndex : -1];
+    const sv = lastSlender && out2 ? lastSlender[out2.govIndex] : null;
+    if (sv && sv.applicable) {
+      const kN = (v) => f(v / 1e3, 1), kNm = (v) => f(v / 1e6, 1);
+      { const e = lastPhi;
+        if (e.mode === 'auto') out.push({ label: 'Effective creep ratio (EC2 §5.8.4, Annex B)', tex: String.raw`h_0 = \frac{2A_c}{u} = ${f(e.h0, 0)}\ \text{mm}, \quad \varphi(\infty, t_0) = \varphi_{RH}\,\beta(f_{cm})\,\beta(t_0) = ${f(e.phiRH, 3)} \times ${f(e.betaFcm, 3)} \times ${f(e.betaT0, 3)} = ${f(e.phiInf, 2)}, \quad \varphi_{ef} = \varphi(\infty, t_0)\,\frac{M_{0Eqp}}{M_{0Ed}} = ${f(e.phiInf, 2)} \times ${state.slender.ratio} = ${f(e.phiEf, 2)}` }); }
+      out.push({ label: `Slenderness inputs, governing case ${state.loads[out2.govIndex].name} (EC2 §5.8.3.1)`, tex: String.raw`\omega = \frac{A_s f_{yd}}{A_c f_{cd}} = ${f(sv.omega, 3)}, \quad n = \frac{N_{Ed}}{A_c f_{cd}} = ${f(sv.n, 3)}, \quad A = ${f(sv.x.A, 3)}, \quad B = \sqrt{1 + 2\omega} = ${f(sv.x.B, 3)}` });
+      for (const a of [sv.x, sv.y]) {
+        const ax = a.axis === 'x' ? 'x' : 'y', dim = a.axis === 'x' ? 'h' : 'b';
+        out.push({ label: `Axis ${ax}: slenderness and limit`, tex: String.raw`\lambda_${ax} = \frac{l_{0,${ax}}}{i_${ax}} = \frac{${f(a.l0, 0)}}{${f(a.i, 1)}} = ${f(a.lambda, 1)}, \quad r_m = \frac{M_{01}}{M_{02}} = \frac{${kNm(a.M01)}}{${kNm(a.M02)}} = ${f(a.rm, 2)}, \quad \lambda_{lim} = \frac{20\,A\,B\,C}{\sqrt{n}} = ${Number.isFinite(a.lambdaLim) ? f(a.lambdaLim, 1) : String.raw`\infty`} \;\Rightarrow\; \text{${a.slender ? 'slender' : 'not slender'}}` });
+        if (a.slender) {
+          out.push({ label: `Axis ${ax}: nominal curvature (EC2 §5.8.8.3)`, tex: String.raw`K_r = ${f(a.Kr, 3)}, \quad K_\varphi = ${f(a.Kphi, 3)}, \quad \frac{1}{r} = K_r K_\varphi \frac{\varepsilon_{yd}}{0.45\,d} = ${(a.invR * 1e6).toFixed(3)} \times 10^{-6}\ \text{mm}^{-1} \quad (d = ${f(a.d, 0)}\ \text{mm})` });
+          out.push({ label: `Axis ${ax}: design moment (EC2 §5.8.8.2)`, tex: String.raw`e_2 = \frac{1}{r}\frac{l_0^2}{10} = ${f(a.e2, 1)}\ \text{mm}, \quad M_2 = N_{Ed}\,e_2 = ${kNm(a.M2)}, \quad M_{Ed,${ax}} = \max\left(M_{02},\, M_{0e} + M_2,\, M_{01} + \tfrac{1}{2}M_2,\, N_{Ed}\,e_0\right) = ${kNm(Math.abs(a.MEd))}\ \text{kNm}` });
+        } else {
+          out.push({ label: `Axis ${ax}: design moment (first order with imperfection; minimum eccentricity EC2 §6.1(4))`, tex: String.raw`M_{Ed,${ax}} = \max\left(M_{02},\, N_{Ed}\,e_0\right) = \max\left(${kNm(a.M02)},\ ${kNm(a.Mmin)}\right) = ${kNm(Math.abs(a.MEd))}\ \text{kNm}, \quad e_0 = \max(${dim}/30,\ 20) = ${f(a.e0, 1)}\ \text{mm}` });
+        }
+      }
+    }
+    if (gr && gr.capacity && gl) {
+      const dem = Math.hypot(gl.p, gl.mx, gl.my), cap = Math.hypot(gr.capacity.pn / 1e3, gr.capacity.mnx / 1e6, gr.capacity.mny / 1e6);
+      out.push({ label: `Demand / capacity, governing case ${gr.name} (radial ratio in N–Mx–My, numbers in kN and kNm)`, tex: String.raw`\frac{D}{C} = \frac{\left\| (N_{Ed},\, M_{Ed,x},\, M_{Ed,y}) \right\|}{\left\| (N_{Rd},\, M_{Rd,x},\, M_{Rd,y}) \right\|} = \frac{\left\| (${f(gl.p, 0)},\, ${f(gl.mx, 0)},\, ${f(gl.my, 0)}) \right\|}{\left\| (${f(gr.capacity.pn / 1e3, 0)},\, ${f(gr.capacity.mnx / 1e6, 0)},\, ${f(gr.capacity.mny / 1e6, 0)}) \right\|} = \frac{${f(dem, 0)}}{${f(cap, 0)}} = ${f(gr.ratio, 3)}` });
+    }
+    return out;
+  }
+
+  // ── Report export (HTML / PDF) ─────────────────────────────────────────────
+  const stamp = () => { const d = new Date(), z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`; };
+  // Opened as a local file: a normal browser download. Inside the claude.ai viewer: its downloads
+  // capability, which asks the viewer to confirm the save. Resolves true when the file was handed over.
+  let viewerDownloads;
+  async function download(blob, name) {
+    if (window.claude && typeof window.claude.use === 'function') {
+      if (viewerDownloads === undefined) viewerDownloads = await window.claude.use('downloads');
+      if (viewerDownloads) {
+        try { await viewerDownloads.save({ filename: name, data: blob }); return true; }
+        catch (err) { setStatus(err && err.code === 'declined' ? 'Export cancelled.' : `Export not available here (${err && err.code || 'error'}).`, err && err.code !== 'declined'); return false; }
+      }
+    }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    return true;
+  }
+  // Redraw every canvas in the light theme on a white ground and grab PNGs, then put the screen back.
+  function captureImages() {
+    const root = document.documentElement, prevTheme = root.getAttribute('data-theme'), prevSel = sel, prevHover = hover, prevHB = hoverBar;
+    root.setAttribute('data-theme', 'light'); sel = new Set(); hover = null; hoverBar = -1;
+    draw(); drawCharts(); draw3d(); if (lastSlender) drawMomentDiagrams();
+    const grab = (id) => {
+      const c = $(id), o = document.createElement('canvas'); o.width = c.width; o.height = c.height;
+      const g = o.getContext('2d'); g.fillStyle = '#ffffff'; g.fillRect(0, 0, o.width, o.height); g.drawImage(c, 0, 0);
+      return { url: o.toDataURL('image/png'), jpg: o.toDataURL('image/jpeg', 0.88), w: o.width, h: o.height };
+    };
+    const imgs = { section: grab('section'), d3: grab('pmm3d'), pm: grab('pmChart'), mm: grab('mmChart'), sl: lastSlender ? grab('slDiagram') : null };
+    if (prevTheme === null) root.removeAttribute('data-theme'); else root.setAttribute('data-theme', prevTheme);
+    sel = prevSel; hover = prevHover; hoverBar = prevHB;
+    draw(); drawCharts(); draw3d(); if (lastSlender) drawMomentDiagrams();
+    return imgs;
+  }
+  function reportData() {
+    const out = lastResult, code = reportDesignCode();
+    const fck = state.fc, fcd = state.alphaCc * fck / 1.5, fyd = state.fy / 1.15;
+    const byDia = new Map();
+    for (const r of state.bars) { const d = barByName(r.bar); byDia.set(d.baseDia, (byDia.get(d.baseDia) || 0) + d.count); }
+    const makeUp = [...byDia.entries()].sort((a, b) => b[0] - a[0]).map(([d, n]) => `${n}T${d}`).join(' + ');
+    const as = state.bars.reduce((t, r) => t + barByName(r.bar).area, 0);
+    const gov = out.results[out.govIndex];
+    return {
+      when: new Date().toLocaleString(), makeUp, as, rho: as / (state.b * state.h) * 100, gov,
+      basis: [
+        ['Design code', 'EN 1992-1-1 (Eurocode 2), section check'],
+        ['Method', `Fibre integration (${fiberCounts().nx} × ${fiberCounts().ny} fibres, ${fmt(state.b / fiberCounts().nx, 1)} × ${fmt(state.h / fiberCounts().ny, 1)} mm), 72 neutral-axis angles × 120 depths, radial 3D D/C solved exactly on the strain plane`],
+        ['Partial factors', 'γc = 1.50, γs = 1.15, αcc = ' + state.alphaCc],
+        ['Concrete model', state.strainProfile === 'Ec3' ? 'Bilinear (εc3, εcu3)' : 'Parabola–rectangle (εc2, εcu2)'],
+        ['Strains', `εc = ${(code.concretePeakStrain(fck) * 1000).toFixed(2)}‰, εcu = ${(code.concreteUltimateStrain(fck) * 1000).toFixed(2)}‰, n = ${code.concreteParabolicExponent(fck).toFixed(2)}, εud = 45‰`],
+        ['Demands', state.slender.on
+          ? `EC2 §5.8 nominal curvature: L = ${state.slender.L} mm, kx = ${state.slender.kx}, ky = ${state.slender.ky}, φef = ${(() => { const e = lastPhi || {mode:'manual',phiEf:state.slender.phiEf||0}; return e.mode === 'auto' ? `${fmt(e.phiEf, 2)} (Annex B: φ(∞,t0) = ${fmt(e.phiInf, 2)} at RH ${state.slender.rh} %, t0 ${state.slender.t0} d, class ${state.slender.cement}, h0 ${fmt(e.h0, 0)} mm; × M0Eqp/M0Ed ${state.slender.ratio})` : `${fmt(e.phiEf, 2)} (entered)`; })()}, ${state.slender.braced ? 'braced' : 'unbraced'}; imperfection l0/400 and minimum eccentricity e0 included`
+          : 'First order, as entered (no slenderness or minimum moment)'],
+      ],
+      materials: [
+        ['Concrete', `${state.concreteGrade}: fck = ${fck} MPa, fcd = ${fcd.toFixed(2)} MPa`],
+        ['Reinforcement', `${state.steelGrade}: fyk = ${state.fy} MPa, fyd = ${fyd.toFixed(1)} MPa, Es = ${state.es} MPa`],
+      ],
+      geometry: [
+        ['Section', `b × h = ${state.b} × ${state.h} mm`],
+        ['Cover to link / link', `${state.cover} mm / Ø${state.link} mm`],
+        ['Reinforcement', `${makeUp}, As = ${as.toFixed(0)} mm², ρ = ${(as / (state.b * state.h) * 100).toFixed(2)}%`],
+      ],
+      bars: state.bars.map((r, i) => [String(i + 1), r.x.toFixed(1), r.y.toFixed(1), r.bar, barByName(r.bar).area.toFixed(0)]),
+      cases: out.results.map((r, i) => {
+        const l = lastDesign[i], c = r.capacity;
+        return [r.name, fmt(l.p), fmt(l.mx), fmt(l.my), fmt(r.ratio, 3), r.pass ? 'OK' : 'Fails', r.thetaDeg != null ? fmt(r.thetaDeg, 1) : '–',
+          c ? fmt(c.pn / 1e3) : '–', c ? fmt(Math.hypot(c.mnx, c.mny) / 1e6) : '–'];
+      }),
+      govIndex: out.govIndex,
+      slRows: lastSlender ? lastSlender.map((sv, i) => [state.loads[i].name,
+        sv.x ? fmt(sv.x.lambda, 1) : '–', sv.x && Number.isFinite(sv.x.lambdaLim) ? fmt(sv.x.lambdaLim, 1) : '–',
+        sv.y ? fmt(sv.y.lambda, 1) : '–', sv.y && Number.isFinite(sv.y.lambdaLim) ? fmt(sv.y.lambdaLim, 1) : '–',
+        sv.status, fmt(sv.mxEd / 1e6, 1), fmt(sv.myEd / 1e6, 1)]) : null,
+      range: `NRd from ${fmt(out.summary.phiPnMin / 1e3)} to ${fmt(out.summary.phiPnMax / 1e3)} kN`,
+    };
+  }
+  const CASE_HEAD_FIRST = ['Case', 'P (kN)', 'Mx (kNm)', 'My (kNm)', 'D/C', '', 'θ (°)', 'NRd (kN)', 'MRd (kNm)'];
+  const CASE_HEAD_SL = ['Case', 'NEd (kN)', 'Mx,Ed (kNm)', 'My,Ed (kNm)', 'D/C', '', 'θ (°)', 'NRd (kN)', 'MRd (kNm)'];
+  const BAR_HEAD = ['#', 'X (mm)', 'Y (mm)', 'Bar', 'A (mm²)'];
+  const SL_HEAD = ['Case', 'λx', 'λlim,x', 'λy', 'λlim,y', 'Status', 'Mx,Ed (kNm)', 'My,Ed (kNm)'];
+  function readyForReport() {
+    if (!lastResult) { setStatus('Nothing to export yet: the section has no valid result.', true); return false; }
+    return true;
+  }
+
+  async function exportHtml() {
+    if (!readyForReport()) return;
+    setStatus('Preparing HTML…', false, true);
+    const MJ = await loadMathJax();
+    const d = reportData(), im = captureImages(), e = escapeHtml;
+    const calc = MJ ? reportFormulas().map((q) => `<div class="calc"><p>${e(q.label)}</p>${texLines(q.tex).map((t) => `<div class="eq">${tex2mml(MJ, t, true)}</div>`).join('')}</div>`).join('') : '<p class="meta">Formulas need MathJax, which could not be loaded.</p>';
+    const kv = (rows) => `<table class="kv">${rows.map(([k, v]) => `<tr><th>${e(k)}</th><td>${e(v)}</td></tr>`).join('')}</table>`;
+    const grid = (head, rows, govRow) => `<table class="grid"><thead><tr>${head.map((h) => `<th>${e(h)}</th>`).join('')}</tr></thead><tbody>${rows.map((r, i) => `<tr${i === govRow ? ' class="gov"' : ''}>${r.map((c, j) => `<td${c === 'Fails' ? ' class="fail"' : c === 'OK' ? ' class="ok"' : ''}>${e(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    const verdict = d.gov ? `<p class="verdict ${d.gov.pass ? 'ok' : 'fail'}"><strong>${fmt(d.gov.ratio, 3)}</strong> ${d.gov.pass ? 'Section is adequate' : 'Section fails'} — governing case ${e(d.gov.name)}</p>` : '';
+    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MBColumn Lite report ${stamp()}</title>
+<style>
+  body { font: 14px/1.5 "Barlow", "Segoe UI", system-ui, sans-serif; color: #1F2A30; background: #fff; margin: 0; }
+  main { max-width: 900px; margin: 0 auto; padding: 32px 24px 48px; }
+  h1 { font-size: 24px; margin: 0 0 2px; } h2 { font-size: 17px; margin: 28px 0 8px; border-bottom: 1px solid #C3CBC8; padding-bottom: 4px; }
+  .meta { color: #56636A; margin: 0 0 16px; }
+  .verdict { font-size: 18px; margin: 12px 0; } .verdict strong { font-size: 30px; margin-right: 8px; }
+  .ok { color: #2E7A4E; } .fail { color: #B8322A; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  table.kv th { text-align: left; color: #56636A; font-weight: 500; width: 190px; padding: 3px 8px 3px 0; vertical-align: top; }
+  table.kv td { padding: 3px 0; }
+  table.grid th, table.grid td { border-bottom: 1px solid #DDE3E1; padding: 4px 8px; text-align: right; }
+  table.grid th:first-child, table.grid td:first-child { text-align: left; } table.grid th { color: #56636A; font-weight: 500; }
+  tr.gov td { font-weight: 700; } tr.gov td:first-child { box-shadow: inset 3px 0 0 #D99A0F; }
+  figure { margin: 12px 0; } figure img { max-width: 100%; border: 1px solid #DDE3E1; border-radius: 3px; }
+  figcaption { color: #56636A; font-size: 12.5px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; } @media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+  .note { color: #56636A; font-size: 12.5px; margin-top: 28px; }
+  .calc p { margin: 12px 0 2px; color: #56636A; font-size: 13px; }
+  .calc .eq { overflow-x: auto; padding: 3px 0 3px 12px; }
+  math { font-family: "Cambria Math", "STIX Two Math", "Latin Modern Math", math; font-size: 1.1em; } math[display="block"] { display: inline math; math-style: normal; }
+</style></head><body><main>
+<h1>MBColumn Lite — column check</h1>
+<p class="meta">Rectangular RC column · Eurocode 2 · fibre PMM · ${e(d.when)}</p>
+${verdict}
+<h2>Design basis</h2>${kv(d.basis)}
+<h2>Materials</h2>${kv(d.materials)}
+<h2>Section</h2>${kv(d.geometry)}
+<figure><img src="${im.section.url}" alt="Section with reinforcement"><figcaption>Section, cover line (dashed) and link line.</figcaption></figure>
+${grid(BAR_HEAD, d.bars, -1)}
+<h2>Calculation</h2>${calc}
+${d.slRows ? `<h2>Slenderness (EC2 §5.8.8, nominal curvature)</h2>${grid(SL_HEAD, d.slRows, d.govIndex)}<p class="meta">Design moments M<sub>Ed</sub> are used in the capacity check below.</p>${im.sl ? `<figure><img src="${im.sl.url}" alt="Moment along the column"><figcaption>Moment along the column, ${e(state.loads[slCaseSel >= 0 ? slCaseSel : d.govIndex].name)}: first order + second order M2 = design.</figcaption></figure>` : ''}` : ''}
+<h2>Load cases and capacity</h2>${grid(state.slender.on ? CASE_HEAD_SL : CASE_HEAD_FIRST, d.cases, d.govIndex)}
+<p class="meta">${e(d.range)}. D/C is the radial ratio of the demand vector to the design surface in (Mx, My, P).</p>
+<h2>Interaction diagrams</h2>
+<figure><img src="${im.d3.url}" alt="3D PMM surface"><figcaption>3D PMM design surface (P-level rings) with the governing ray.</figcaption></figure>
+<div class="two"><figure><img src="${im.pm.url}" alt="P–M diagram"><figcaption>P–M at the governing moment direction.</figcaption></figure>
+<figure><img src="${im.mm.url}" alt="Mx–My diagram"><figcaption>Mx–My at the governing axial load.</figcaption></figure></div>
+<p class="note">Sign convention: ${e(SIGN_NOTE)} Coordinates are measured from the section centroid.<br>
+MBColumn Lite is a preliminary study tool. Results must be verified by a qualified structural engineer before use in design or construction.</p>
+</main></body></html>`;
+    if (await download(new Blob([html], { type: 'text/html' }), `MBColumnLite_report_${stamp()}.html`)) setStatus('HTML report downloaded.');
+  }
+
+  function loadJsPdf() {
+    if (window.jspdf) return Promise.resolve(window.jspdf);
+    const tryLoad = (src) => new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = src; sc.onload = () => (window.jspdf ? res(window.jspdf) : rej(new Error('jsPDF missing'))); sc.onerror = rej; document.head.appendChild(sc); });
+    return tryLoad('vendor/jspdf.umd.min.js').catch(() => tryLoad('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'));
+  }
+  // The standard PDF fonts have no Greek or math glyphs: spell them out.
+  const pdfText = (t) => String(t)
+    .replace(/γc/g, 'gamma_c').replace(/γs/g, 'gamma_s').replace(/αcc/g, 'alpha_cc').replace(/εcu/g, 'eps_cu').replace(/εud/g, 'eps_ud')
+    .replace(/εc2|εc3/g, (m) => 'eps_' + m.slice(1)).replace(/εc/g, 'eps_c').replace(/ρ/g, 'rho').replace(/λ/g, 'lambda').replace(/φ/g, 'phi').replace(/θ/g, 'theta').replace(/φ/g, 'phi')
+    .replace(/‰/g, ' per mille').replace(/²/g, '2').replace(/−/g, '-').replace(/–/g, '-').replace(/—/g, '-').replace(/≤/g, '<=').replace(/⊙/g, '(o)');
+
+  async function exportPdf() {
+    if (!readyForReport()) return;
+    const btn = $('exportPdf'); btn.disabled = true; setStatus('Preparing PDF…', false, true);
+    try {
+      const { jsPDF } = await loadJsPdf();
+      const MJ = await loadMathJax();
+      const formulas = [];
+      if (MJ) for (const q of reportFormulas()) { const imgs = []; for (const t of texLines(q.tex)) imgs.push(await mmlToImage(tex2mml(MJ, t, true), 3)); formulas.push({ label: q.label, imgs }); }
+      const d = reportData(), im = captureImages();
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' }), W = 210, H = 297, M = 16, CW = W - 2 * M;
+      let y = M;
+      const ink = [31, 42, 48], mute = [86, 99, 106], rule = [195, 203, 200];
+      const need = (h) => { if (y + h > H - M) { doc.addPage(); y = M; } };
+      const text = (t, x, yy, opt) => doc.text(pdfText(t), x, yy, opt);
+      const h2 = (t) => { need(14); y += 4; doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...ink); text(t, M, y); y += 1.8; doc.setDrawColor(...rule); doc.line(M, y, W - M, y); y += 5; };
+      const kv = (rows) => { doc.setFontSize(9.5); for (const [k, v] of rows) { const lines = doc.splitTextToSize(pdfText(v), CW - 48); need(lines.length * 4.6 + 1); doc.setFont('helvetica', 'normal'); doc.setTextColor(...mute); text(k, M, y); doc.setTextColor(...ink); doc.text(lines, M + 48, y); y += lines.length * 4.6 + 0.6; } };
+      const grid = (head, rows, widths, govRow) => {
+        const total = widths.reduce((a, b) => a + b, 0), sc = CW / total, wd = widths.map((w) => w * sc);
+        const row = (cells, bold, color) => {
+          need(6); let x = M;
+          cells.forEach((c, j) => {
+            doc.setFont('helvetica', bold ? 'bold' : 'normal');
+            doc.setTextColor(...(c === 'Fails' ? [184, 50, 42] : c === 'OK' ? [46, 122, 78] : color));
+            const tx = pdfText(c); if (j === 0) doc.text(tx, x + 1, y); else doc.text(tx, x + wd[j] - 1, y, { align: 'right' });
+            x += wd[j];
+          });
+          y += 1.6; doc.setDrawColor(...rule); doc.line(M, y, W - M, y); y += 3.6;
+        };
+        doc.setFontSize(9); row(head, false, mute);
+        rows.forEach((r, i) => row(r, i === govRow, ink));
+      };
+      const image = (img, wmm) => { const hmm = wmm * img.h / img.w; need(hmm + 4); doc.addImage(img.jpg, 'JPEG', M + (CW - wmm) / 2, y, wmm, hmm); y += hmm + 4; };
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(17); doc.setTextColor(...ink); text('MBColumn Lite — column check', M, y + 2); y += 8;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...mute); text(`Rectangular RC column · Eurocode 2 · fibre PMM · ${d.when}`, M, y); y += 8;
+      if (d.gov) {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(...(d.gov.pass ? [46, 122, 78] : [184, 50, 42])); text(fmt(d.gov.ratio, 3), M, y + 3);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(...ink); text(`${d.gov.pass ? 'Section is adequate' : 'Section fails'} - governing case ${d.gov.name}`, M + 26, y + 2); y += 10;
+      }
+      h2('Design basis'); kv(d.basis);
+      h2('Materials'); kv(d.materials);
+      h2('Section'); kv(d.geometry); y += 2; image(im.section, 110);
+      grid(BAR_HEAD, d.bars, [10, 24, 24, 18, 20], -1);
+      if (formulas.length) {
+        h2('Calculation');
+        for (const q of formulas) {
+          // images are in CSS px at a 16 px font; 0.2646 mm per px, scaled to suit the 9.5 pt body text
+          const sized = q.imgs.map((img) => { let wmm = img.w * 0.2646 * 0.62, hmm = img.h * 0.2646 * 0.62; if (wmm > CW - 6) { hmm *= (CW - 6) / wmm; wmm = CW - 6; } return { img, wmm, hmm }; });
+          need(sized[0].hmm + 11);
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...mute); text(q.label, M, y); y += 2.5;
+          for (const z of sized) { need(z.hmm + 1); doc.addImage(z.img.url, 'JPEG', M + 4, y, z.wmm, z.hmm); y += z.hmm + 0.5; }
+          y += 4;
+        }
+      }
+      if (d.slRows) { h2('Slenderness (EC2 5.8.8, nominal curvature)'); grid(SL_HEAD, d.slRows, [20, 11, 13, 11, 13, 22, 18, 18], d.govIndex); if (im.sl) { y += 2; image(im.sl, 120); } }
+      h2('Load cases and capacity'); grid(state.slender.on ? CASE_HEAD_SL : CASE_HEAD_FIRST, d.cases, [22, 16, 16, 16, 12, 10, 12, 18, 18], d.govIndex);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...mute); text(d.range + '. D/C is the radial ratio of the demand vector to the design surface.', M, y); y += 6;
+      need(CW * im.d3.h / im.d3.w + 16); h2('Interaction diagrams'); image(im.d3, CW);
+      { const wmm = (CW - 6) / 2, h1 = wmm * im.pm.h / im.pm.w, h2m = wmm * im.mm.h / im.mm.w; need(Math.max(h1, h2m) + 4);
+        doc.addImage(im.pm.jpg, 'JPEG', M, y, wmm, h1); doc.addImage(im.mm.jpg, 'JPEG', M + wmm + 6, y, wmm, h2m); y += Math.max(h1, h2m) + 4; }
+      need(16); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...mute);
+      const note = doc.splitTextToSize(pdfText(`Sign convention: ${SIGN_NOTE} Coordinates from the section centroid. MBColumn Lite is a preliminary study tool; results must be verified by a qualified structural engineer before use in design or construction.`), CW);
+      doc.text(note, M, y);
+      const pages = doc.getNumberOfPages();
+      for (let i = 1; i <= pages; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(...mute); doc.text(`MBColumn Lite · page ${i} of ${pages}`, W - M, H - 8, { align: 'right' }); }
+      if (await download(doc.output('blob'), `MBColumnLite_report_${stamp()}.pdf`)) setStatus('PDF report downloaded.');
+    } catch (err) {
+      setStatus(`PDF export failed: ${err.message || err}. The HTML report still works.`, true);
+    } finally { btn.disabled = false; }
+  }
+  $('exportHtml').addEventListener('click', exportHtml);
+  $('exportPdf').addEventListener('click', exportPdf);
+
+  // ── Boot ────────────────────────────────────────────────────────────────────
+  function layout() {
+    const r = resizeCanvas(cv); cssW = r.w; cssH = r.h; fitView(); draw(); drawCharts(); draw3d();
+  }
+  mergeOverlaps(); syncInputs(); renderRebarTable(); renderLoadTable();
+  new ResizeObserver(layout).observe(cv.parentElement);
+  new ResizeObserver(request3d).observe(cv3);
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { draw(); drawCharts(); draw3d(); });
+  layout(); runSolve(); recordHistory();
+  setTimeout(typesetLabels, 600);
+})();
+</script>
+</body>
+</html>
