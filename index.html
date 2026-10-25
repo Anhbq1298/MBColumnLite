@@ -1271,7 +1271,14 @@ window.MBCOLUMN_API_URL = window.MBCOLUMN_API_URL || 'https://mbcolumnlite-api.o
       { const fc = fiberCounts(); $('fiberInfo').textContent = `${fc.nx} × ${fc.ny} fibres of ${fmt(state.b / fc.nx, 1)} × ${fmt(state.h / fc.ny, 1)} mm`; }
       setStatus(`Solved in ${out.elapsedMs} ms · ${solver.mode}${mergeNote ? ` · ${mergeNote[0].toUpperCase()}${mergeNote.slice(1)}` : ''}`); mergeNote = '';
     } catch (err) {
-      if (id === runSeq) setStatus(`Solver error: ${err.message}`, true);
+      if (id === runSeq) {
+        const message = `Solver error: ${err.message || err}`;
+        setStatus(message, true);
+        lastResult = null;
+        $('verdict').innerHTML = `<span class="what error">${escapeHtml(message)}. Check Render service and ALLOWED_ORIGINS.</span>`;
+        $('resTable').tBodies[0].innerHTML = '';
+        ['pmChart', 'mmChart', 'pmm3d'].forEach(k => { const z=resizeCanvas($(k));z.g.clearRect(0,0,z.w,z.h); });
+      }
     }
   }
 
