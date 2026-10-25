@@ -523,10 +523,21 @@ window.MBCOLUMN_API_URL = window.MBCOLUMN_API_URL || 'https://mbcolumnlite-api.o
     mode: 'private API',
     async call(route, input) {
       const root = window.MBCOLUMN_API_URL.replace(/\/$/, '');
-      const response = await fetch(root + '/api/' + route, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input)
-      });
-      const data = await response.json();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 90000);
+      let response, data;
+      try {
+        response = await fetch(root + '/api/' + route, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input), signal: controller.signal
+        });
+        data = await response.json();
+      } catch (err) {
+        if (err.name === 'AbortError') throw new Error('API timed out after 90 seconds. Check Render service or retry.');
+        throw new Error('Cannot reach calculation API (' + (err.message || err) + '). Check Render deployment and CORS.');
+      } finally {
+        clearTimeout(timeout);
+      }
       if (!response.ok) throw new Error(data.error || 'API error ' + response.status);
       return data;
     },
