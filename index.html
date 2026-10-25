@@ -528,7 +528,7 @@ window.MBCOLUMN_API_URL = window.MBCOLUMN_API_URL || 'https://mbcolumnlite-api.o
       let response, data;
       try {
         response = await fetch(root + '/api/' + route, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
           body: JSON.stringify(input), signal: controller.signal
         });
         data = await response.json();
